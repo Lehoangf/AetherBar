@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="AetherBar.Core/AetherBar.Core.csproj" />
+  <Project Path="AetherBar.Hooker/AetherBar.Hooker.csproj" />
+  <Project Path="AetherBar.Plugins/AetherBar.Plugins.csproj" />
+  <Project Path="AetherBar.Tests/AetherBar.Tests.csproj" />
+  <Project Path="AetherBar.UI/AetherBar.UI.csproj" />
+</Solution>

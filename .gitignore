@@ -1,0 +1,29 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+*.userprefs
+.vs/
+*.DotSettings.user
+
+## Publish output
+publish/
+*.zip
+
+## Installer
+*.exe
+
+## Test results
+TestResults/
+*.trx
+
+## NuGet
+packages/
+*.nupkg
+
+## OS
+Thumbs.db
+.DS_Store
+Desktop.ini

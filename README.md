@@ -1,0 +1,238 @@
+# AetherBar
+
+**Open-source Windows Taskbar Widget Engine** — Embed audio visualizers, media info, and live widgets directly into your Windows taskbar via native Win32 embedding.
+
+![License](https://img.shields.io/badge/license-MIT-blue)
+![.NET](https://img.shields.io/badge/.NET-8.0-purple)
+![Platform](https://img.shields.io/badge/platform-Windows%2010%2020H1%2B-success)
+
+---
+
+## Features
+
+### 🎵 Audio Visualizer
+Real-time FFT audio visualization at 60fps directly in the taskbar using NAudio WASAPI loopback capture. Four rendering modes:
+
+| Mode | Description |
+|------|-------------|
+| **Bar** | Vertical bars from bottom edge, one per frequency band |
+| **Line** | Filled area under curve + thick outline + glow dots |
+| **Dot** | Glowing dot matrix in a grid layout (max 4 rows) |
+| **Circle** | Fan-shaped wedges radiating from bottom-center with center pulse |
+
+**8 Color Themes:** Rainbow, Neon Blue, Matrix Green, Fire, Monochrome, Sunset, Ocean, Cyberpunk + Custom R/G/B sliders. Colors are applied left-to-right across the widget width.
+
+### 🎚 Audio Pipeline
+- WASAPI loopback capture (all system audio) via NAudio
+- 1024-point FFT with Hann window
+- Logarithmic frequency binning (40 Hz – 16 kHz, 256 bins, min 2 FFT bins per bar)
+- Exponential smoothing (factor 0.35) for fluid motion
+- Noise gate (threshold), sensitivity multiplier, and bar start offset (skip low freqs)
+- Configurable per-mode: BarCount (8–256), Opacity (0.1–1.0), ShowPeak indicator
+
+### 📻 Media Info Display
+Shows currently playing song metadata from any Windows Media Transport Controls source (Spotify, Chrome, YouTube, Media Player, etc.):
+- Title, artist text overlay
+- 24×24 album art thumbnail
+- Adaptive Theme — extracts dominant color from album art to tint the widget background
+- Play/pause state detection
+
+### 🪟 Taskbar Integration
+Native Win32 embedding via `SetParent` into `Shell_TrayWnd`:
+- Widget is a true CHILD of the taskbar (not overlay/popup)
+- **4 position modes:** Left, Center, Right, Auto
+- **200ms reposition timer** adapts to icon changes dynamically
+- Detects start button width, tray area width, and taskbar orientation (Bottom/Top/Left/Right)
+- SetWindowsHookEx(WH_SHELL) for layout change events
+- Alt+Tab hidden via WS_EX_TOOLWINDOW
+
+### 🎨 Visual Effects
+| Effect | Support |
+|--------|---------|
+| **Acrylic (Blur)** | Windows 10+ via `SetWindowCompositionAttribute` |
+| **Mica** | Windows 11+ via `DwmSetWindowAttribute` |
+| **Immersive Dark Mode** | Title bar + widget background |
+| **Corner Radius** | Configurable 0–12 px |
+| **Widget Padding** | Configurable 0–20 px |
+
+### ⚙️ Settings Dashboard
+Fluent Design settings window with 4 tabs. Every change applies live — no Save button needed.
+
+- **Visualizer tab:** Mode, Color Theme, Custom Color (R/G/B sliders), Opacity, Bar Count, Sensitivity, Threshold, Bar Start Offset, Show Peak
+- **Taskbar tab:** Position, Widget Width, Horizontal Offset, Widget Padding, Show Media Info, Text Color (Auto/White/Black/Red/Green/Blue/Cyan/Yellow/Custom + R/G/B), Auto-hide
+- **Effects tab:** Background Effect (None/Acrylic/Mica), Corner Radius, Adaptive Theme
+- **General tab:** Start with Windows, Start Minimized (tray only), Dark Mode, Game Mode, Check for Updates, Reset to Defaults
+
+### 🔌 Plugin System
+Extensible via collectible `AssemblyLoadContext`:
+- `IPlugin` interface with `InitializeAsync` / `ShutdownAsync`
+- `IPluginContext` provides `TaskbarHwnd` and `CreateWidget()`
+- `PluginManager` loads/unloads assemblies at runtime
+
+### 🖥 System Tray Icon
+H.NotifyIcon.Wpf `TaskbarIcon` with context menu (Show/Hide, Settings, Exit). Icon loaded from multi-resolution `.ico` (16×16 – 256×256).
+
+### 🎮 Game Mode
+Detects fullscreen foreground windows (games) via polling `GetForegroundWindow` — auto-hides the widget.
+
+### 🎨 Theme System
+- **Dark/Light mode** via WPF-UI `ApplicationThemeManager.Apply()`
+- **Red accent color** across tabs, icons, and controls
+- 25+ custom resource brushes for Surface, Text, Card, ComboBox, Slider, Tab colors
+- Tool window style hidden from Alt+Tab
+
+---
+
+## Architecture
+
+```
+AetherBar.slnx
+├── AetherBar.Core         — Core logic library
+│   ├── Audio/             — NAudio WASAPI capture + FFT pipeline
+│   ├── Media/             — WinRT media metadata + DominantColorExtractor
+│   ├── Models/            — AudioData, MediaInfo, TaskbarInfo
+│   ├── Settings/          — AetherBarSettings (JSON persistence)
+│   └── Visualizer/        — IVisualizerRenderer + 4 modes + color engine
+├── AetherBar.Hooker       — Win32 interop library
+│   ├── Interop/           — NativeMethods, DesktopWindowManager (DWM)
+│   ├── TaskbarHooker.cs   — Find Shell_TrayWnd, SetParent, positioning
+│   ├── TaskbarWatcher.cs  — WH_SHELL hook for layout changes
+│   └── GameModeDetector.cs— Fullscreen app detection
+├── AetherBar.UI           — WPF application (WinExe)
+│   ├── MainWindow.xaml    — Widget window (tray icon, visualizer, album art)
+│   ├── SettingsWindow.xaml— 4-tab settings dialog (Fluent Design)
+│   ├── Visualizers/       — VisualizerControl (FrameworkElement)
+│   ├── Styles/            — FluentStyles.xaml, LightTheme.xaml
+│   └── Assets/            — AetherBar.ico (multi-resolution)
+├── AetherBar.Plugins      — Plugin interface + collectible AssemblyLoadContext
+└── AetherBar.Tests        — xUnit unit tests (6 tests)
+```
+
+### Data Flow
+
+```
+System Audio → NAudio WASAPI → FFT (1024, Hann, log bins)
+                                    ↓
+                              VisualizerController
+                                    ↓
+                              VisualizerControl.OnRender()
+                                    ↓
+                              IVisualizerRenderer.Render()
+                                    ↓
+                              DrawingContext (WPF, 60fps)
+
+WinRT Media Session → MediaManager (1s poll) → MainWindow UI update
+                                                      ↓
+                                              DominantColorExtractor
+                                                      ↓
+                                              Adaptive background tint
+
+Taskbar Layout → WH_SHELL hook → TaskbarHooker.RefreshTaskbarInfo()
+                                          ↓
+                                  200ms timer → RepositionWidget()
+```
+
+### Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Framework | .NET 8 WPF (`net8.0-windows10.0.26100.0`) |
+| Audio | NAudio 2.3.0 (WASAPI loopback + FFT) |
+| Win32 | PInvoke.User32 / PInvoke.Kernel32 |
+| WinRT | Microsoft.Windows.CsWinRT (Windows.Media.Control) |
+| Tray Icon | H.NotifyIcon.Wpf 2.3.2 |
+| UI Theme | WPF-UI 4.2.1 |
+| Testing | xUnit 2.5.3 + coverlet |
+
+---
+
+## Requirements
+
+- **OS:** Windows 10 20H1 (build 19041) or later (Windows 11 recommended for Mica)
+- **Runtime:** [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
+- **Permission:** Must run as **Administrator** (required for `SetParent` into `Shell_TrayWnd`)
+
+> **Note:** The Mica backdrop effect is Windows 11–only and silently degrades on Windows 10. All other features (Acrylic, visualizer, media info, tray icon, settings) work fully on Windows 10.
+
+---
+
+## Getting Started
+
+### Build & Run
+
+```bash
+git clone https://github.com/yourusername/AetherBar.git
+cd AetherBar
+dotnet restore AetherBar.slnx
+dotnet build AetherBar.slnx --configuration Release
+.\AetherBar.UI\bin\Release\net8.0-windows10.0.26100.0\AetherBar.UI.exe
+```
+
+### One-click Install
+
+Run `install.cmd` as Administrator to install dependencies, build, and optionally register for automatic startup.
+
+---
+
+## Settings
+
+Settings are persisted as JSON at `%LOCALAPPDATA%\AetherBar\settings.json`.
+
+### Visualizer (per mode)
+
+| Setting | Default | Range |
+|---------|---------|-------|
+| BarCount | 32 | 8–256 |
+| Sensitivity | 1.0 | 0.1–3.0 |
+| Threshold | 0.0 | 0.0–0.5 |
+| BarStartOffset | 0 | 0–250 |
+| ColorTheme | "Rainbow" | 9 themes |
+| Opacity | 0.5 | 0.1–1.0 |
+| ShowPeak | true | bool |
+
+### Taskbar
+
+| Setting | Default | Range |
+|---------|---------|-------|
+| WidgetWidth | 180 | 100–800 |
+| Position | "Auto" | Left/Center/Right/Auto |
+| OffsetX | 0 | –100 – 2000 |
+| WidgetPadding | 2 | 0–20 |
+| WidgetTextColor | "Auto" | Auto/White/Black/Red/Green/Blue/Cyan/Yellow/Custom |
+
+### Effects
+
+| Setting | Default | Options |
+|---------|---------|---------|
+| BackgroundEffect | "Transparent" | None/Acrylic (Blur)/Mica |
+| CornerRadius | 4 | 0–12 |
+| AdaptiveTheme | true | bool |
+| EnableDarkMode | true | bool |
+
+### General
+
+| Setting | Default |
+|---------|---------|
+| StartWithWindows | false |
+| StartMinimized | true |
+| EnableGameMode | true |
+| CheckForUpdates | true |
+
+---
+
+## Project Status
+
+| Phase | Status |
+|-------|--------|
+| 1 — Taskbar hooking, Win32 interop, dynamic spacing | ✅ |
+| 2 — Audio capture (FFT), media metadata, dominant color | ✅ |
+| 3 — Visualizer rendering (Bar/Line/Dot/Circle), tray icon | ✅ |
+| 4 — Settings dashboard, Acrylic/Mica, dark/light theme | ✅ |
+| 5 — Plugin marketplace, scripting support | 🔜 |
+| 6 — System monitor widgets (CPU, RAM, network), layouts | 🔜 |
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.

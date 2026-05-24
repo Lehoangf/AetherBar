@@ -1,0 +1,37 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <SolidColorBrush x:Key="FluentAccent" Color="#D13438"/>
+    <SolidColorBrush x:Key="FluentAccentDark" Color="#A4262C"/>
+    <SolidColorBrush x:Key="SurfaceColor" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="SurfaceAltColor" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="TextPrimary" Color="#1A1A1A"/>
+    <SolidColorBrush x:Key="TextSecondary" Color="#666666"/>
+    <SolidColorBrush x:Key="TextTertiary" Color="#999999"/>
+    <SolidColorBrush x:Key="CardBackground" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="CardBorder" Color="#D0D0D0"/>
+    <SolidColorBrush x:Key="CardHover" Color="#E8E8E8"/>
+    <SolidColorBrush x:Key="TabInactive" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="TabHover" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="TitleBarBg" Color="#E8E8E8"/>
+    <SolidColorBrush x:Key="FooterBg" Color="#E8E8E8"/>
+    <SolidColorBrush x:Key="WindowBackground" Color="#FAFAFA"/>
+    <SolidColorBrush x:Key="CustomColorPanelBg" Color="#F5F5F5"/>
+    <SolidColorBrush x:Key="PopupBackground" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="PopupBorder" Color="#D0D0D0"/>
+    <SolidColorBrush x:Key="ComboBoxBackground" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="ComboBoxForeground" Color="#1A1A1A"/>
+    <SolidColorBrush x:Key="ComboBoxHover" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="ComboBoxSelected" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="ButtonHover" Color="#D0D0D0"/>
+    <SolidColorBrush x:Key="ButtonPressed" Color="#B0B0B0"/>
+    <SolidColorBrush x:Key="TabHeaderBg" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="TabHeaderBorder" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="SliderArrow" Color="#666666"/>
+    <SolidColorBrush x:Key="SliderTrack" Color="#D0D0D0"/>
+    <SolidColorBrush x:Key="SliderTrackHover" Color="#C0C0C0"/>
+    <SolidColorBrush x:Key="SliderThumb" Color="#666666"/>
+    <SolidColorBrush x:Key="SliderThumbHover" Color="#333333"/>
+    <SolidColorBrush x:Key="SliderTickBar" Color="#AAAAAA"/>
+    <SolidColorBrush x:Key="SliderBorder" Color="#CCCCCC"/>
+</ResourceDictionary>
