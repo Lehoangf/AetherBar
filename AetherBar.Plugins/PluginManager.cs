@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using System.IO;
 
 namespace AetherBar.Plugins;
 
@@ -13,15 +14,39 @@ public class PluginManager : IDisposable
 
     public IReadOnlyList<IPlugin> Plugins => _plugins.AsReadOnly();
 
+    public void LoadPluginsFromDirectory(string directory)
+    {
+        if (!Directory.Exists(directory))
+            return;
+
+        foreach (var dll in Directory.EnumerateFiles(directory, "*.dll", SearchOption.TopDirectoryOnly))
+        {
+            try
+            {
+                LoadPlugin(dll);
+            }
+            catch
+            {
+                // ignore individual plugin load failures, but write to host log
+                try
+                {
+                    var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                    var dir = Path.Combine(appData, "AetherBar");
+                    Directory.CreateDirectory(dir);
+                    var logPath = Path.Combine(dir, "plugin.log");
+                    File.AppendAllText(logPath, $"[{DateTime.Now:O}] Failed to load {dll}\r\n");
+                }
+                catch { }
+            }
+        }
+    }
+
     public bool LoadPlugin(string assemblyPath)
     {
         try
         {
-            var loadContext = new PluginLoadContext(assemblyPath);
-            _loadContexts.Add(loadContext);
-
-            var assembly = loadContext.LoadFromAssemblyName(
-                AssemblyName.GetAssemblyName(assemblyPath));
+            // Load plugin into default load context so it shares host types (PluginWidget, IPluginContext, etc.)
+            var assembly = Assembly.LoadFrom(assemblyPath);
 
             foreach (var type in assembly.GetExportedTypes())
             {
@@ -37,8 +62,17 @@ public class PluginManager : IDisposable
             }
             return false;
         }
-        catch
+        catch (Exception ex)
         {
+            try
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var dir = Path.Combine(appData, "AetherBar");
+                Directory.CreateDirectory(dir);
+                var logPath = Path.Combine(dir, "plugin.log");
+                File.AppendAllText(logPath, $"[{DateTime.Now:O}] LoadPlugin failed for {assemblyPath}: {ex}\r\n");
+            }
+            catch { }
             return false;
         }
     }
@@ -47,6 +81,16 @@ public class PluginManager : IDisposable
     {
         foreach (var plugin in _plugins)
         {
+            try
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var dir = Path.Combine(appData, "AetherBar");
+                Directory.CreateDirectory(dir);
+                var logPath = Path.Combine(dir, "plugin.log");
+                File.AppendAllText(logPath, $"[{DateTime.Now:O}] Initializing plugin: {plugin.Name} ({plugin.GetType().FullName})\r\n");
+            }
+            catch { }
+
             await plugin.InitializeAsync(context);
         }
     }
@@ -83,6 +127,11 @@ public class PluginManager : IDisposable
 
         protected override Assembly? Load(AssemblyName assemblyName)
         {
+            // Prefer using the default load context for shared host assemblies so plugin types
+            // like AetherBar.Plugins.PluginWidget remain identical between host and plugin.
+            if (assemblyName.Name == "AetherBar.Plugins" || assemblyName.Name == "AetherBar.Core")
+                return null; // fallback to default context
+
             var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
             if (assemblyPath != null)
                 return LoadFromAssemblyPath(assemblyPath);

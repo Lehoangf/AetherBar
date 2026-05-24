@@ -6,6 +6,17 @@ public class AetherBarSettings
     public TaskbarSettings Taskbar { get; set; } = new();
     public EffectsSettings Effects { get; set; } = new();
     public GeneralSettings General { get; set; } = new();
+    public Dictionary<string, PluginItemSettings> Plugins { get; set; } = new();
+}
+
+public class PluginItemSettings
+{
+    public string Alignment { get; set; } = "Right"; // "Left", "Center", "Right"
+    public int Padding { get; set; } = 0;
+    public int Width { get; set; } = -1; // -1 means default Auto/NaN
+    public bool Enabled { get; set; } = true;
+    public int SortOrder { get; set; } = 0;
+    public Dictionary<string, string> CustomSettings { get; set; } = new();
 }
 
 public class VisualizerSettings

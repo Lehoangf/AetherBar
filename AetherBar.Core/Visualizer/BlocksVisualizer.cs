@@ -24,11 +24,11 @@ public class BlocksVisualizer : IVisualizerRenderer
         for (int i = 0; i < barCount; i++)
         {
             int idx = offset + (int)((float)i / barCount * effectiveLength);
-            if (idx >= fftData.Length) continue;
+            if (idx >= fftData.Length || idx < 0) continue;
             float value = Math.Min(1, fftData[idx] * (float)options.Sensitivity);
             if (value < options.Threshold) continue;
 
-            int activeBlocks = (int)(value * maxBlocks);
+            int activeBlocks = (int)Math.Ceiling(value * maxBlocks);
             double x = i * barWidth;
             double w = Math.Max(1, barWidth - 1);
 

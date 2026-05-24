@@ -1,0 +1,7 @@
+{
+  "id": "com.aetherbar.sample.systemmonitor",
+  "name": "System Monitor (Sample)",
+  "version": "1.0.0",
+  "author": "AetherBar Team",
+  "enabled": true
+}

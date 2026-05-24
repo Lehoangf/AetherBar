@@ -28,7 +28,7 @@ public class DotVisualizer : IVisualizerRenderer
         for (int i = 0; i < totalCells; i++)
         {
             int idx = offset + i;
-            if (idx >= fftData.Length) break;
+            if (idx >= fftData.Length || idx < 0) break;
 
             float value = Math.Min(1, fftData[idx] * (float)options.Sensitivity);
             if (value < options.Threshold) continue;

@@ -78,6 +78,13 @@ Extensible via collectible `AssemblyLoadContext`:
 - `IPlugin` interface with `InitializeAsync` / `ShutdownAsync`
 - `IPluginContext` provides `TaskbarHwnd` and `CreateWidget()`
 - `PluginManager` loads/unloads assemblies at runtime
+- `IPluginWithSettings` lets plugins expose custom controls in the Settings window
+- `PluginWidget` supports text content, font size, vertical offset, single text color, and separate top/bottom line colors
+- Plugin projects can import `AetherBar.Plugins/AetherBar.Plugin.targets` to auto-reference the plugin API and copy outputs to the app `plugins` folder
+- Included sample plugins:
+  - `Custom Text`: editable taskbar text with font size, vertical offset, and text color settings
+  - `System Monitor (Sample)`: live CPU/RAM widget with separate CPU and RAM color settings
+- See `PLUGIN_DEVELOPMENT.md` for the plugin project template, lifecycle rules, settings API, and sample plugin patterns.
 
 ### 🖥 System Tray Icon
 H.NotifyIcon.Wpf `TaskbarIcon` with context menu (Show/Hide, Settings, Exit). Icon loaded from multi-resolution `.ico` (16×16 – 256×256).
@@ -114,8 +121,13 @@ AetherBar.slnx
 │   ├── Visualizers/       — VisualizerControl (FrameworkElement)
 │   ├── Styles/            — FluentStyles.xaml, LightTheme.xaml
 │   └── Assets/            — AetherBar.ico (multi-resolution)
-├── AetherBar.Plugins      — Plugin interface + collectible AssemblyLoadContext
-└── AetherBar.Tests        — xUnit unit tests (6 tests)
+├── AetherBar.Plugins      — Plugin interface, shared plugin targets, PluginManager
+├── AetherBar.Plugins.CustomText
+│                           — Sample configurable text plugin
+├── AetherBar.Plugins.SampleSystemMonitor
+│                           — Sample CPU/RAM plugin
+├── PLUGIN_DEVELOPMENT.md   — Plugin authoring guide
+└── AetherBar.Tests         — xUnit unit tests (6 tests)
 ```
 
 ### Data Flow
@@ -176,9 +188,23 @@ dotnet build AetherBar.slnx --configuration Release
 .\AetherBar.UI\bin\Release\net8.0-windows10.0.26100.0\AetherBar.UI.exe
 ```
 
+If AetherBar is already running while you build, Windows may lock plugin DLLs under `AetherBar.UI/bin/.../plugins/`. Exit AetherBar before rebuilding plugins if MSBuild reports copy warnings for plugin DLLs.
+
 ### One-click Install
 
 Run `install.cmd` as Administrator to install dependencies, build, and optionally register for automatic startup.
+
+### Plugin Development
+
+Use `PLUGIN_DEVELOPMENT.md` as the source of truth for creating plugins. The shortest in-repo plugin project file is:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\AetherBar.Plugins\AetherBar.Plugin.targets" />
+</Project>
+```
+
+Each plugin should include a `plugin.json` manifest and one exported class implementing `IPlugin` or `IPluginWithSettings`. Build output is copied automatically into the app `plugins` folder.
 
 ---
 
@@ -225,6 +251,25 @@ Settings are persisted as JSON at `%LOCALAPPDATA%\AetherBar\settings.json`.
 | StartMinimized | true |
 | EnableGameMode | true |
 | CheckForUpdates | true |
+
+### Plugins
+
+Plugins have shared layout controls in the Settings window:
+
+| Setting | Description |
+|---------|-------------|
+| Enabled | Turns a plugin on or off |
+| Alignment | Left, Center, or Right plugin panel |
+| SortOrder | Display order within its panel |
+| Padding | Horizontal offset for the plugin widget |
+| Width | Fixed widget width, or auto when unset |
+
+Plugins may also expose their own settings through `IPluginWithSettings`.
+
+| Plugin | Custom Settings |
+|--------|-----------------|
+| Custom Text | Text Content, Font Size, Vertical Offset, Text Color |
+| System Monitor (Sample) | CPU Color, RAM Color |
 
 ---
 

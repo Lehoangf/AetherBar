@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AetherBar.Core\AetherBar.Core.csproj" />
     <ProjectReference Include="..\AetherBar.Hooker\AetherBar.Hooker.csproj" />
+    <ProjectReference Include="..\AetherBar.Plugins\AetherBar.Plugins.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

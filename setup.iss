@@ -8,9 +8,9 @@
 ;   2. iscc setup.iss
 
 #define MyAppName "AetherBar"
-#define MyAppVersion "0.1.2"
+#define MyAppVersion "0.2.0"
 #define MyAppPublisher "AetherBar"
-#define MyAppURL "https://github.com/yourusername/AetherBar"
+#define MyAppURL "https://github.com/Lehoangf/AetherBar"
 #define MyAppExeName "AetherBar.UI.exe"
 #define MyAppAssocName MyAppName + " File"
 #define MyAppAssocExt ".myp"

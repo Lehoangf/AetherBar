@@ -8,6 +8,8 @@ using System.Windows.Interop;
 using System.Windows.Threading;
 using AetherBar.Core.Settings;
 using AetherBar.Core.Visualizer;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace AetherBar.UI;
 
@@ -15,6 +17,8 @@ public partial class SettingsWindow : Window
 {
     private readonly SettingsManager _settingsManager;
     private bool _loading;
+    private Point _dragStartPoint;
+    private bool _isDragging;
 
     public SettingsWindow(SettingsManager settingsManager)
     {
@@ -112,6 +116,13 @@ public partial class SettingsWindow : Window
         StartMinimizedCheck.IsChecked = s.General.StartMinimized;
         GameModeCheck.IsChecked = s.General.EnableGameMode;
         UpdateCheck.IsChecked = s.General.CheckForUpdates;
+
+        PopulateCombo(PluginAlignmentCombo, "Left", "Center", "Right");
+        BlockComboScroll(PluginSelectorCombo);
+        BlockComboScroll(PluginAlignmentCombo);
+        PopulatePluginsList();
+        PopulatePluginsSortList();
+
         UpdateSliderValueLabels();
         _loading = false;
     }
@@ -414,6 +425,403 @@ public partial class SettingsWindow : Window
         if (combo.SelectedItem is ComboBoxItem item)
             return item.Content?.ToString() ?? "";
         return "";
+    }
+
+    private void PopulatePluginsList()
+    {
+        PluginSelectorCombo.Items.Clear();
+        
+        if (Application.Current.MainWindow is MainWindow mw && mw.PluginManager != null)
+        {
+            var plugins = mw.PluginManager.Plugins;
+            if (plugins.Count > 0)
+            {
+                NoPluginsText.Visibility = Visibility.Collapsed;
+                PluginSettingsPanel.Visibility = Visibility.Visible;
+                
+                foreach (var plugin in plugins)
+                {
+                    PluginSelectorCombo.Items.Add(new ComboBoxItem { Content = plugin.Name });
+                }
+                PluginSelectorCombo.SelectedIndex = 0;
+                LoadSelectedPluginSettings();
+            }
+            else
+            {
+                NoPluginsText.Visibility = Visibility.Visible;
+                PluginSettingsPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+        else
+        {
+            NoPluginsText.Visibility = Visibility.Visible;
+            PluginSettingsPanel.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void OnPluginSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        LoadSelectedPluginSettings();
+    }
+
+    private void LoadSelectedPluginSettings()
+    {
+        if (PluginSelectorCombo.SelectedItem is not ComboBoxItem selectedItem) return;
+        var pluginName = selectedItem.Content?.ToString();
+        if (string.IsNullOrEmpty(pluginName)) return;
+
+        var wasLoading = _loading;
+        _loading = true;
+        
+        var s = _settingsManager.Current;
+        PluginItemSettings? ps = null;
+        if (s.Plugins != null)
+        {
+            s.Plugins.TryGetValue(pluginName, out ps);
+        }
+
+        var alignment = ps?.Alignment ?? "Right";
+        var padding = ps?.Padding ?? 0;
+        var width = ps?.Width ?? -1;
+        var enabled = ps?.Enabled ?? true;
+
+        SelectItem(PluginAlignmentCombo, alignment);
+        PluginPaddingSlider.Value = padding;
+        PluginEnabledCheck.IsChecked = enabled;
+        
+        if (width > 0)
+        {
+            PluginCustomWidthCheck.IsChecked = true;
+            PluginWidthSlider.Value = width;
+            PluginWidthPanel.IsEnabled = true;
+        }
+        else
+        {
+            PluginCustomWidthCheck.IsChecked = false;
+            PluginWidthSlider.Value = 150; // default display value
+            PluginWidthPanel.IsEnabled = false;
+        }
+        
+        UpdatePluginLabels();
+        LoadCustomSettingsUI(pluginName, ps);
+
+        _loading = wasLoading;
+    }
+
+    private void UpdatePluginLabels()
+    {
+        PluginPaddingValue.Text = ((int)PluginPaddingSlider.Value).ToString();
+        PluginWidthValue.Text = ((int)PluginWidthSlider.Value).ToString();
+        PluginWidthPanel.Visibility = (PluginCustomWidthCheck.IsChecked == true) 
+            ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnPluginSettingChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        if (PluginSelectorCombo.SelectedItem is not ComboBoxItem selectedItem) return;
+        var pluginName = selectedItem.Content?.ToString();
+        if (string.IsNullOrEmpty(pluginName)) return;
+
+        _settingsManager.Update(s =>
+        {
+            if (s.Plugins == null)
+            {
+                s.Plugins = new Dictionary<string, PluginItemSettings>();
+            }
+
+            if (!s.Plugins.TryGetValue(pluginName, out var ps))
+            {
+                ps = new PluginItemSettings();
+                s.Plugins[pluginName] = ps;
+            }
+
+            ps.Alignment = GetSelected(PluginAlignmentCombo);
+            ps.Padding = (int)PluginPaddingSlider.Value;
+            ps.Enabled = PluginEnabledCheck.IsChecked ?? true;
+            
+            if (PluginCustomWidthCheck.IsChecked == true)
+            {
+                ps.Width = (int)PluginWidthSlider.Value;
+            }
+            else
+            {
+                ps.Width = -1;
+            }
+
+            return s;
+        });
+
+        UpdatePluginLabels();
+
+        if (Application.Current.MainWindow is MainWindow mw)
+            mw.RefreshSettings();
+    }
+
+    private AetherBar.Plugins.IPlugin? GetActivePluginInstance(string pluginName)
+    {
+        if (Application.Current.MainWindow is MainWindow mw && mw.PluginManager != null)
+        {
+            return mw.PluginManager.Plugins.FirstOrDefault(p => p.Name == pluginName);
+        }
+        return null;
+    }
+
+    private void LoadCustomSettingsUI(string pluginName, PluginItemSettings? ps)
+    {
+        CustomSettingsContainer.Children.Clear();
+        var activePlugin = GetActivePluginInstance(pluginName);
+
+        if (activePlugin is AetherBar.Plugins.IPluginWithSettings pws)
+        {
+            PluginCustomSettingsCard.Visibility = Visibility.Visible;
+            var defs = pws.GetSettingDefinitions();
+            if (defs == null || defs.Count == 0)
+            {
+                PluginCustomSettingsCard.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            foreach (var def in defs)
+            {
+                string currentValue = null;
+                if (ps != null && ps.CustomSettings != null)
+                {
+                    ps.CustomSettings.TryGetValue(def.Key, out currentValue);
+                }
+                currentValue ??= def.DefaultValue;
+
+                var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+
+                if (def.Type.Equals("bool", StringComparison.OrdinalIgnoreCase))
+                {
+                    var cb = new CheckBox
+                    {
+                        Content = def.DisplayName,
+                        IsChecked = currentValue.Equals("true", StringComparison.OrdinalIgnoreCase),
+                        Margin = new Thickness(0, 4, 0, 0),
+                        FontSize = 13,
+                        FontWeight = FontWeights.Medium
+                    };
+                    cb.Checked += (s, e) => SaveCustomSetting(pluginName, def.Key, "true");
+                    cb.Unchecked += (s, e) => SaveCustomSetting(pluginName, def.Key, "false");
+                    panel.Children.Add(cb);
+                }
+                else
+                {
+                    var header = new TextBlock
+                    {
+                        Text = def.DisplayName.ToUpper(),
+                        FontSize = 10,
+                        FontWeight = FontWeights.Bold,
+                        Foreground = (Brush)Application.Current.Resources["TextSecondary"],
+                        Margin = new Thickness(0, 0, 0, 4)
+                    };
+                    panel.Children.Add(header);
+
+                    var tb = new TextBox
+                    {
+                        Text = currentValue,
+                        Height = 32,
+                        Padding = new Thickness(8, 4, 8, 4),
+                        FontSize = 13,
+                        VerticalContentAlignment = VerticalAlignment.Center,
+                        Background = (Brush)Application.Current.Resources["WindowBackground"],
+                        Foreground = (Brush)Application.Current.Resources["TextPrimary"],
+                        BorderBrush = (Brush)Application.Current.Resources["CardBorder"],
+                        BorderThickness = new Thickness(1),
+                    };
+                    
+                    tb.TextChanged += (s, e) => SaveCustomSetting(pluginName, def.Key, tb.Text);
+                    panel.Children.Add(tb);
+                }
+
+                if (!string.IsNullOrEmpty(def.Description))
+                {
+                    var desc = new TextBlock
+                    {
+                        Text = def.Description,
+                        FontSize = 11,
+                        Foreground = (Brush)Application.Current.Resources["TextTertiary"],
+                        Margin = new Thickness(0, 4, 0, 0),
+                        TextWrapping = TextWrapping.Wrap
+                    };
+                    panel.Children.Add(desc);
+                }
+
+                CustomSettingsContainer.Children.Add(panel);
+            }
+        }
+        else
+        {
+            PluginCustomSettingsCard.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void SaveCustomSetting(string pluginName, string key, string value)
+    {
+        if (_loading) return;
+
+        _settingsManager.Update(s =>
+        {
+            if (s.Plugins == null) s.Plugins = new Dictionary<string, PluginItemSettings>();
+            if (!s.Plugins.TryGetValue(pluginName, out var ps))
+            {
+                ps = new PluginItemSettings();
+                s.Plugins[pluginName] = ps;
+            }
+            if (ps.CustomSettings == null) ps.CustomSettings = new Dictionary<string, string>();
+            ps.CustomSettings[key] = value;
+            return s;
+        });
+
+        var activePlugin = GetActivePluginInstance(pluginName);
+        if (activePlugin is AetherBar.Plugins.IPluginWithSettings pws)
+        {
+            try
+            {
+                pws.OnSettingChanged(key, value);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to notify setting change to plugin {pluginName}: {ex.Message}");
+            }
+        }
+    }
+
+    private void PopulatePluginsSortList()
+    {
+        PluginsSortListBox.Items.Clear();
+
+        if (Application.Current.MainWindow is MainWindow mw && mw.PluginManager != null)
+        {
+            var s = _settingsManager.Current;
+            var plugins = mw.PluginManager.Plugins.ToList();
+            
+            // Sort plugins by their SortOrder in settings
+            plugins.Sort((a, b) =>
+            {
+                int orderA = s.Plugins != null && s.Plugins.TryGetValue(a.Name, out var psA) ? psA.SortOrder : 0;
+                int orderB = s.Plugins != null && s.Plugins.TryGetValue(b.Name, out var psB) ? psB.SortOrder : 0;
+                return orderA.CompareTo(orderB);
+            });
+
+            for (int i = 0; i < plugins.Count; i++)
+            {
+                PluginsSortListBox.Items.Add($"{i + 1}. {plugins[i].Name}");
+            }
+        }
+    }
+
+    private void PluginsSortListBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragStartPoint = e.GetPosition(null);
+    }
+
+    private void PluginsSortListBox_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed && !_isDragging)
+        {
+            Point position = e.GetPosition(null);
+
+            if (Math.Abs(position.X - _dragStartPoint.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                Math.Abs(position.Y - _dragStartPoint.Y) > SystemParameters.MinimumVerticalDragDistance)
+            {
+                ListBox listBox = (ListBox)sender;
+                var item = FindVisualParent<ListBoxItem>(e.OriginalSource as DependencyObject);
+
+                if (item != null)
+                {
+                    _isDragging = true;
+                    DragDrop.DoDragDrop(listBox, item.Content, DragDropEffects.Move);
+                    _isDragging = false;
+                }
+            }
+        }
+    }
+
+    private void PluginsSortListBox_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private void PluginsSortListBox_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(typeof(string)))
+        {
+            string droppedData = (string)e.Data.GetData(typeof(string));
+            ListBox listBox = (ListBox)sender;
+
+            var dropTargetItem = FindVisualParent<ListBoxItem>(e.OriginalSource as DependencyObject);
+            int dropIndex = -1;
+
+            if (dropTargetItem != null)
+            {
+                dropIndex = listBox.ItemContainerGenerator.IndexFromContainer(dropTargetItem);
+            }
+            else
+            {
+                dropIndex = listBox.Items.Count - 1;
+            }
+
+            int sourceIndex = listBox.Items.IndexOf(droppedData);
+            if (sourceIndex != -1 && dropIndex != -1 && sourceIndex != dropIndex)
+            {
+                var items = new List<string>();
+                foreach (var item in listBox.Items)
+                {
+                    items.Add(item.ToString() ?? "");
+                }
+
+                string itemToMove = items[sourceIndex];
+                items.RemoveAt(sourceIndex);
+                items.Insert(dropIndex, itemToMove);
+
+                var pluginNamesInOrder = items.Select(x => {
+                    int dotIndex = x.IndexOf('.');
+                    if (dotIndex != -1)
+                        return x.Substring(dotIndex + 1).Trim();
+                    return x;
+                }).ToList();
+
+                _settingsManager.Update(s =>
+                {
+                    if (s.Plugins == null)
+                    {
+                        s.Plugins = new Dictionary<string, PluginItemSettings>();
+                    }
+
+                    for (int i = 0; i < pluginNamesInOrder.Count; i++)
+                    {
+                        string name = pluginNamesInOrder[i];
+                        if (!s.Plugins.TryGetValue(name, out var ps))
+                        {
+                            ps = new PluginItemSettings();
+                            s.Plugins[name] = ps;
+                        }
+                        ps.SortOrder = i;
+                    }
+                    return s;
+                });
+
+                PopulatePluginsSortList();
+
+                if (Application.Current.MainWindow is MainWindow mw)
+                    mw.RefreshSettings();
+            }
+        }
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
+    {
+        if (child == null) return null;
+        DependencyObject parentObject = VisualTreeHelper.GetParent(child);
+        if (parentObject == null) return null;
+        if (parentObject is T parent)
+            return parent;
+        return FindVisualParent<T>(parentObject);
     }
 
     private void OnTitleBarMouseDown(object sender, MouseButtonEventArgs e)

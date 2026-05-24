@@ -198,7 +198,7 @@
                                     </Grid>
                                     <Slider x:Name="SensitivitySlider"
                                             
-                                            Minimum="0.1" Maximum="3.0" TickFrequency="0.1"
+                                            Minimum="0.1" Maximum="15.0" TickFrequency="0.1"
                                             ValueChanged="OnSettingChanged"/>
 
                                     <Grid Margin="0,12,0,0">
@@ -429,6 +429,167 @@
                                 </StackPanel>
                             </Border>
 
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- === PLUGINS TAB === -->
+                <TabItem Header="Plugins" Tag="&#xE71D;">
+                    <ScrollViewer VerticalScrollBarVisibility="Hidden"
+                                   Background="Transparent">
+                        <StackPanel>
+                            <!-- No Plugins Alert -->
+                            <TextBlock x:Name="NoPluginsText"
+                                       Text="No plugins found. Place plugin DLLs in the 'plugins' directory."
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       FontSize="13"
+                                       HorizontalAlignment="Center"
+                                       Margin="24"
+                                       Visibility="Collapsed"/>
+
+                            <!-- Plugin Settings Panel -->
+                            <StackPanel x:Name="PluginSettingsPanel">
+                                <!-- Card: Selection -->
+                                <Border Style="{StaticResource FluentCard}">
+                                    <StackPanel>
+                                        <TextBlock Text="PLUGIN SELECTION" Style="{StaticResource CardTitle}"/>
+                                        <TextBlock Text="ACTIVE PLUGIN" Style="{StaticResource SectionHeader}"/>
+                                        <ComboBox x:Name="PluginSelectorCombo"
+                                                  SelectionChanged="OnPluginSelectionChanged"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Card: Layout & Styling -->
+                                <Border Style="{StaticResource FluentCard}">
+                                    <StackPanel>
+                                        <TextBlock Text="LAYOUT &amp; ALIGNMENT" Style="{StaticResource CardTitle}"/>
+
+                                        <CheckBox x:Name="PluginEnabledCheck"
+                                                  Content="Enable Plugin"
+                                                  Margin="0,0,0,12"
+                                                  Checked="OnPluginSettingChanged"
+                                                  Unchecked="OnPluginSettingChanged"/>
+                                        
+                                        <TextBlock Text="ALIGNMENT" Style="{StaticResource SectionHeader}"/>
+                                        <ComboBox x:Name="PluginAlignmentCombo"
+                                                  SelectionChanged="OnPluginSettingChanged"/>
+
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="HORIZONTAL SHIFT / OFFSET" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                            <TextBlock x:Name="PluginPaddingValue" Text="0" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                        </Grid>
+                                        <Slider x:Name="PluginPaddingSlider"
+                                                Minimum="-150" Maximum="150" TickFrequency="5"
+                                                ValueChanged="OnPluginSettingChanged"/>
+
+                                        <CheckBox x:Name="PluginCustomWidthCheck"
+                                                  Content="Enable Custom Width"
+                                                  Margin="0,16,0,0"
+                                                  Checked="OnPluginSettingChanged"
+                                                  Unchecked="OnPluginSettingChanged"/>
+
+                                        <StackPanel x:Name="PluginWidthPanel" Margin="0,12,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="CUSTOM WIDTH" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                                <TextBlock x:Name="PluginWidthValue" Text="150" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                            </Grid>
+                                            <Slider x:Name="PluginWidthSlider"
+                                                    Minimum="50" Maximum="400" TickFrequency="5"
+                                                    ValueChanged="OnPluginSettingChanged"/>
+                                        </StackPanel>
+
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Card: Plugin Ordering (Drag and Drop) -->
+                                <Border Style="{StaticResource FluentCard}">
+                                    <StackPanel>
+                                        <TextBlock Text="PLUGIN ORDERING" Style="{StaticResource CardTitle}"/>
+                                        <TextBlock Text="DRAG AND DROP ITEMS TO CHANGE ORDER" Style="{StaticResource SectionHeader}"/>
+                                         <ListBox x:Name="PluginsSortListBox"
+                                                  Margin="0,8,0,0"
+                                                  Height="46"
+                                                  Background="Transparent"
+                                                  BorderBrush="Transparent"
+                                                  BorderThickness="0"
+                                                  Padding="0"
+                                                  AllowDrop="True"
+                                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                                  ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                                  PreviewMouseLeftButtonDown="PluginsSortListBox_PreviewMouseLeftButtonDown"
+                                                  PreviewMouseMove="PluginsSortListBox_PreviewMouseMove"
+                                                  DragOver="PluginsSortListBox_DragOver"
+                                                  Drop="PluginsSortListBox_Drop">
+                                             <ListBox.ItemsPanel>
+                                                 <ItemsPanelTemplate>
+                                                     <StackPanel Orientation="Horizontal" IsItemsHost="True"/>
+                                                 </ItemsPanelTemplate>
+                                             </ListBox.ItemsPanel>
+                                             <ListBox.ItemContainerStyle>
+                                                 <Style TargetType="ListBoxItem">
+                                                     <Setter Property="Background" Value="{DynamicResource TitleBarBg}"/>
+                                                     <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                                     <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
+                                                     <Setter Property="BorderThickness" Value="1"/>
+                                                     <Setter Property="Padding" Value="12,6"/>
+                                                     <Setter Property="Margin" Value="0,0,8,0"/>
+                                                     <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                     <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                                     <Setter Property="Cursor" Value="SizeAll"/>
+                                                     <Setter Property="Template">
+                                                         <Setter.Value>
+                                                             <ControlTemplate TargetType="ListBoxItem">
+                                                                 <Border Background="{TemplateBinding Background}"
+                                                                         BorderBrush="{TemplateBinding BorderBrush}"
+                                                                         BorderThickness="{TemplateBinding BorderThickness}"
+                                                                         CornerRadius="6"
+                                                                         Padding="{TemplateBinding Padding}"
+                                                                         SnapsToDevicePixels="True">
+                                                                     <StackPanel Orientation="Horizontal">
+                                                                         <!-- Drag handle icon -->
+                                                                         <TextBlock Text="&#xE75E;" FontFamily="Segoe MDL2 Assets" 
+                                                                                    FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                                                    Foreground="{DynamicResource TextSecondary}"/>
+                                                                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                                                     </StackPanel>
+                                                                 </Border>
+                                                                 <ControlTemplate.Triggers>
+                                                                     <Trigger Property="IsMouseOver" Value="True">
+                                                                         <Setter Property="Background" Value="{DynamicResource SurfaceAltColor}"/>
+                                                                         <Setter Property="BorderBrush" Value="{DynamicResource FluentAccent}"/>
+                                                                     </Trigger>
+                                                                     <Trigger Property="IsSelected" Value="True">
+                                                                         <Setter Property="Background" Value="{DynamicResource FluentAccent}"/>
+                                                                         <Setter Property="Foreground" Value="White"/>
+                                                                         <Setter Property="BorderBrush" Value="{DynamicResource FluentAccent}"/>
+                                                                     </Trigger>
+                                                                 </ControlTemplate.Triggers>
+                                                             </ControlTemplate>
+                                                         </Setter.Value>
+                                                     </Setter>
+                                                 </Style>
+                                             </ListBox.ItemContainerStyle>
+                                         </ListBox>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Card: Custom Plugin Settings -->
+                                <Border x:Name="PluginCustomSettingsCard" Style="{StaticResource FluentCard}" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <TextBlock Text="CUSTOM PLUGIN SETTINGS" Style="{StaticResource CardTitle}"/>
+                                        <StackPanel x:Name="CustomSettingsContainer" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>

@@ -27,7 +27,7 @@ public class CircleVisualizer : IVisualizerRenderer
         for (int i = 0; i < segments; i++)
         {
             int idx = offset + (int)((float)i / segments * effectiveLength);
-            if (idx >= fftData.Length) continue;
+            if (idx >= fftData.Length || idx < 0) continue;
             float value = Math.Min(1, fftData[idx] * (float)options.Sensitivity);
             if (value < options.Threshold) continue;
 
@@ -74,7 +74,7 @@ public class CircleVisualizer : IVisualizerRenderer
             for (int i = 0; i < segments; i++)
             {
                 int idx = offset + (int)((float)i / segments * effectiveLength);
-                if (idx >= fftData.Length) continue;
+                if (idx >= fftData.Length || idx < 0) continue;
                 float value = Math.Min(1, fftData[idx] * (float)options.Sensitivity);
                 if (value < options.Threshold) { first = true; continue; }
                 double angle = i * angleStep;

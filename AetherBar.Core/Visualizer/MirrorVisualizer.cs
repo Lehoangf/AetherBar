@@ -23,7 +23,7 @@ public class MirrorVisualizer : IVisualizerRenderer
         for (int i = 0; i < barCount; i++)
         {
             int idx = offset + (int)((float)i / barCount * effectiveLength);
-            if (idx >= fftData.Length) continue;
+            if (idx >= fftData.Length || idx < 0) continue;
             float value = Math.Min(1, fftData[idx] * (float)options.Sensitivity);
             if (value < options.Threshold) continue;
             double barHeight = value * maxHeight;

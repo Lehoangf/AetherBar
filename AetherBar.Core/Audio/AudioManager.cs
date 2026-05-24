@@ -54,13 +54,61 @@ public class AudioManager : IDisposable
 
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
-        var buffer = e.Buffer;
-        var bytesPerSample = _capture?.WaveFormat.BitsPerSample / 8 ?? 2;
+        if (_capture == null) return;
 
-        for (int i = 0; i < e.BytesRecorded && _fftPos < _fftSize; i += bytesPerSample)
+        var buffer = e.Buffer;
+        int bytesPerSample = _capture.WaveFormat.BitsPerSample / 8;
+        if (bytesPerSample <= 0) bytesPerSample = 2; // fallback
+
+        int channels = _capture.WaveFormat.Channels;
+        if (channels <= 0) channels = 2; // fallback
+
+        int frameSize = channels * bytesPerSample;
+        bool isFloat = _capture.WaveFormat.Encoding == WaveFormatEncoding.IeeeFloat || _capture.WaveFormat.BitsPerSample == 32;
+
+        for (int i = 0; i + frameSize <= e.BytesRecorded && _fftPos < _fftSize; i += frameSize)
         {
-            float sample = BitConverter.ToInt16(buffer, i) / 32768f;
-            _fftBuffer[_fftPos++] = sample;
+            float sum = 0;
+            for (int c = 0; c < channels; c++)
+            {
+                int sampleOffset = i + c * bytesPerSample;
+                float sample = 0;
+
+                if (isFloat)
+                {
+                    if (sampleOffset + 4 <= e.BytesRecorded)
+                    {
+                        sample = BitConverter.ToSingle(buffer, sampleOffset);
+                    }
+                }
+                else if (bytesPerSample == 2)
+                {
+                    if (sampleOffset + 2 <= e.BytesRecorded)
+                    {
+                        sample = BitConverter.ToInt16(buffer, sampleOffset) / 32768f;
+                    }
+                }
+                else if (bytesPerSample == 3)
+                {
+                    if (sampleOffset + 3 <= e.BytesRecorded)
+                    {
+                        int sampleVal = (buffer[sampleOffset + 2] << 16) | (buffer[sampleOffset + 1] << 8) | buffer[sampleOffset];
+                        if ((sampleVal & 0x800000) != 0) sampleVal |= unchecked((int)0xff000000); // sign extend
+                        sample = sampleVal / 8388608f;
+                    }
+                }
+                else if (bytesPerSample == 4)
+                {
+                    if (sampleOffset + 4 <= e.BytesRecorded)
+                    {
+                        sample = BitConverter.ToInt32(buffer, sampleOffset) / 2147483648f;
+                    }
+                }
+
+                sum += sample;
+            }
+
+            _fftBuffer[_fftPos++] = sum / channels;
         }
 
         if (_fftPos >= _fftSize)
@@ -127,21 +175,54 @@ public class AudioManager : IDisposable
                 if (mag > maxMag) maxMag = mag;
             }
 
-            // Convert to dB and normalize to 0-1
-            float db = 20 * (float)Math.Log10(maxMag + 1e-10f);
-            float normalized = (db + 50) / 50f;
+            // Apply frequency-dependent equalization (EQ) boost
+            // Bass and Treble naturally have lower visual energy compared to Mids in FFT,
+            // so we balance them dynamically.
+            float freq = (float)Math.Exp(logMin + (float)i / barCount * logRange);
+            float boost = 1.0f;
+            if (freq < 250f) // Bass: progressive boost below 250Hz
+            {
+                boost = 1.0f + (250f - freq) / 250f * 0.8f; // up to 1.8x boost for cymbals/kick cheng
+            }
+            else if (freq > 1500f) // High-mids/Treble: progressive quadratic boost above 1.5kHz
+            {
+                float t = Math.Min(1.0f, (freq - 1500f) / 14500f);
+                boost = 1.0f + t * 4.0f; // up to 5.0x boost for high-end crispness
+            }
+
+            float finalMag = maxMag * boost;
+
+            // Convert to dB and normalize to 0-1 with a -60dB floor (more sensitive to cymbals and cheng-cheng transients)
+            float db = 20 * (float)Math.Log10(finalMag + 1e-10f);
+            float normalized = (db + 60f) / 60f;
             if (normalized < 0) normalized = 0;
             if (normalized > 1) normalized = 1;
-            bars[i] = Math.Max(0.02f, normalized);
+            
+            // Apply a high-contrast power curve to make peak frequencies sharp, punchy, and distinct
+            float contrasted = (float)Math.Pow(normalized, 1.3f);
+            bars[i] = Math.Max(0.02f, contrasted);
 
-            if (normalized > peak) peak = normalized;
+            if (contrasted > peak) peak = contrasted;
         }
 
         peak = Math.Min(1, peak);
 
-        float smoothFactor = 0.35f;
         for (int i = 0; i < barCount; i++)
         {
+            float freq = (float)Math.Exp(logMin + (float)i / barCount * logRange);
+            float smoothFactor = 0.35f;
+            if (freq < 250f)
+            {
+                // Slower smoothing for bass to keep visual bars solid and punchy without cringey flickering
+                smoothFactor = 0.28f;
+            }
+            else if (freq > 2000f)
+            {
+                // Faster smoothing for treble to let high cymbals/vocals react snap-instantly
+                float t = Math.Min(1.0f, (freq - 2000f) / 14000f);
+                smoothFactor = 0.35f + t * 0.15f; // Up to 0.50f
+            }
+
             _smoothedFft[i] += (bars[i] - _smoothedFft[i]) * smoothFactor;
         }
 

@@ -15,6 +15,7 @@ public partial class App : Application
 {
     private SettingsManager? _settingsManager;
     private SettingsWindow? _settingsWindow;
+    // plugin manager moved to MainWindow for taskbar-aware initialization
 
     public SettingsManager Settings => _settingsManager ??= new SettingsManager();
 
@@ -26,6 +27,8 @@ public partial class App : Application
         _settingsManager = new SettingsManager();
         _settingsManager.Load();
 
+        // plugin initialization is deferred to MainWindow where the taskbar hook is available
+
         ApplyTheme(_settingsManager.Current.Effects.EnableDarkMode);
 
         if (_settingsManager.Current.General.StartWithWindows)
@@ -33,6 +36,8 @@ public partial class App : Application
 
         base.OnStartup(e);
     }
+
+    // previous PluginHostContext removed; plugin initialization moved to MainWindow
 
     public void ApplyTheme(bool isDark)
     {

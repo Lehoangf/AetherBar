@@ -94,6 +94,49 @@ public class TaskbarHooker : IDisposable
         return true;
     }
 
+    public bool EmbedWindowNextTo(nint childHwnd, nint anchorHwnd, bool after = true, int offsetX = 8)
+    {
+        if (_taskbarHwnd == 0)
+            return false;
+
+        _embeddedWindowHwnd = childHwnd;
+
+        var style = GetWindowLong(childHwnd, GWL_STYLE);
+        style &= ~(WS_POPUP);
+        style |= WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS;
+        SetWindowLong(childHwnd, GWL_STYLE, style);
+
+        var result = SetParent(childHwnd, _taskbarHwnd);
+        if (result == 0 && Marshal.GetLastWin32Error() != 0)
+        {
+            _embeddedWindowHwnd = 0;
+            return false;
+        }
+
+        // position next to anchor
+        if (!GetWindowRect(_taskbarHwnd, out RECT taskbarRect))
+            return false;
+
+        RECT anchorRect = default;
+        if (anchorHwnd != 0 && IsWindow(anchorHwnd))
+            GetWindowRect(anchorHwnd, out anchorRect);
+        else
+            anchorRect = taskbarRect;
+
+        int widgetWidth = 200;
+        if (GetWindowRect(childHwnd, out RECT embeddedRect))
+            widgetWidth = embeddedRect.Width;
+
+        int x = after ? anchorRect.Right + offsetX : anchorRect.Left - widgetWidth - offsetX;
+        int y = taskbarRect.Top;
+        int height = taskbarRect.Bottom - taskbarRect.Top;
+
+        ShowWindow(childHwnd, 5);
+        SetWindowPos(childHwnd, HWND_TOP, Math.Max(0, x), Math.Max(0, y), widgetWidth, Math.Max(30, height), SWP_NOACTIVATE);
+
+        return true;
+    }
+
     public void PositionEmbeddedWindow(string position = "Auto", int offsetX = 0)
     {
         if (_embeddedWindowHwnd == 0 || _taskbarHwnd == 0)

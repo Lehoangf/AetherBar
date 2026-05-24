@@ -1,0 +1,28 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Library</OutputType>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <AetherBarPluginHostDir>$(MSBuildThisFileDirectory)..\AetherBar.UI\bin\$(Configuration)\$(TargetFramework)\plugins\</AetherBarPluginHostDir>
+    <AetherBarPluginPublishDir>$(MSBuildThisFileDirectory)..\publish\plugins\</AetherBarPluginPublishDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)AetherBar.Plugins.csproj" />
+  </ItemGroup>
+
+  <Target Name="CopyAetherBarPlugin" AfterTargets="Build">
+    <ItemGroup>
+      <AetherBarPluginFiles Include="$(TargetPath)" />
+      <AetherBarPluginFiles Include="@(ReferenceCopyLocalPaths)" />
+      <AetherBarPluginFiles Include="$(MSBuildProjectDirectory)\plugin.json" Condition="Exists('$(MSBuildProjectDirectory)\plugin.json')" />
+    </ItemGroup>
+
+    <MakeDir Directories="$(AetherBarPluginHostDir)" />
+    <MakeDir Directories="$(AetherBarPluginPublishDir)" />
+    <Copy SourceFiles="@(AetherBarPluginFiles)" DestinationFolder="$(AetherBarPluginHostDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(AetherBarPluginFiles)" DestinationFolder="$(AetherBarPluginPublishDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

@@ -22,8 +22,12 @@ public class LineVisualizer : IVisualizerRenderer
         for (int i = 0; i < pointCount; i++)
         {
             int idx = offset + (int)((float)i / pointCount * effectiveLength);
-            float value = Math.Min(1, fftData[idx] * (float)options.Sensitivity);
-            if (value < (float)options.Threshold) value = 0;
+            float value = 0;
+            if (idx >= 0 && idx < fftData.Length)
+            {
+                value = Math.Min(1, fftData[idx] * (float)options.Sensitivity);
+                if (value < (float)options.Threshold) value = 0;
+            }
             values[i] = value;
         }
 

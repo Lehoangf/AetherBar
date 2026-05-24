@@ -54,8 +54,9 @@ public class VisualizerControl : FrameworkElement
 
     protected override System.Windows.Size MeasureOverride(System.Windows.Size availableSize)
     {
-        return new System.Windows.Size(Math.Min(200, availableSize.Width),
-                                        Math.Min(30, availableSize.Height));
+        var width = double.IsInfinity(availableSize.Width) ? 200 : availableSize.Width;
+        var height = double.IsInfinity(availableSize.Height) ? 30 : availableSize.Height;
+        return new System.Windows.Size(Math.Max(0, width), Math.Max(0, height));
     }
 
     public void Cleanup()

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -28,10 +28,25 @@ public partial class MainWindow : Window
     private GameModeDetector? _gameMode;
     private SettingsManager _settingsManager = null!;
     private bool _embedded;
+    private AetherBar.Plugins.PluginManager? _pluginManager;
+    private bool _pluginsInitialized;
     private bool _mediaActive;
     private int _retryCount;
     private bool _hasAlbumArt;
     private MediaInfo? _currentMedia;
+    private readonly HashSet<AetherBar.Plugins.IPlugin> _runningPlugins = new();
+
+    public class ActivePluginWidgetInfo
+    {
+        public AetherBar.Plugins.IPlugin? Plugin { get; set; }
+        public string WidgetName { get; set; } = string.Empty;
+        public Border Host { get; set; } = null!;
+        public int DefaultWidth { get; set; }
+    }
+
+    private readonly List<ActivePluginWidgetInfo> _activePluginWidgets = new();
+
+    public AetherBar.Plugins.PluginManager? PluginManager => _pluginManager;
 
     public MainWindow()
     {
@@ -52,6 +67,8 @@ public partial class MainWindow : Window
         _hooker = new TaskbarHooker();
         _retryCount = 0;
         TryEmbed();
+
+        // attempt plugin initialization (TryEmbed will call InitializePluginsIfNeeded on success)
 
         _audioManager = new AudioManager();
         _audioManager.StartCapture();
@@ -185,6 +202,8 @@ public partial class MainWindow : Window
             }
             WidgetContainer.Padding = new Thickness(s.Taskbar.WidgetPadding);
             WidgetContainer.CornerRadius = new CornerRadius(s.Effects.CornerRadius);
+            var widgetScale = Math.Clamp(s.Taskbar.WidgetWidth / 180.0, 0.85, 1.25);
+            SongInfoText.FontSize = 10 * widgetScale;
             bool showMedia = s.Taskbar.ShowMediaInfo;
             SongInfoText.Visibility = showMedia && _mediaActive ? Visibility.Visible : Visibility.Collapsed;
             AlbumArtImage.Visibility = showMedia && _hasAlbumArt ? Visibility.Visible : Visibility.Collapsed;
@@ -212,6 +231,163 @@ public partial class MainWindow : Window
 
             SongInfoText.Foreground = GetTextColorBrush(s.Taskbar.WidgetTextColor,
                 s.Taskbar.WidgetTextColorR, s.Taskbar.WidgetTextColorG, s.Taskbar.WidgetTextColorB, isDark);
+
+            // Handle dynamically enabling/disabling plugins
+            if (_pluginManager != null)
+            {
+                foreach (var plugin in _pluginManager.Plugins)
+                {
+                    var pluginName = plugin.Name;
+                    PluginItemSettings? ps = null;
+                    bool shouldBeEnabled = true;
+                    if (s.Plugins != null && s.Plugins.TryGetValue(pluginName, out ps))
+                    {
+                        shouldBeEnabled = ps.Enabled;
+                    }
+
+                    bool isRunning = _runningPlugins.Contains(plugin);
+
+                    if (shouldBeEnabled && !isRunning)
+                    {
+                        // Dynamically enable
+                        _runningPlugins.Add(plugin);
+                        var panel = PluginPanelRight ?? (WidgetContainer.Child as Panel) ?? new Grid();
+                        if (ps != null)
+                        {
+                            if (ps.Alignment == "Left") panel = PluginPanelLeft;
+                            else if (ps.Alignment == "Center") panel = PluginPanelCenter;
+                        }
+                        var context = new PluginHostContext(_hooker!, new WindowInteropHelper(this).Handle, panel, this)
+                        {
+                            CurrentPlugin = plugin
+                        };
+
+                        // Run custom settings mapping
+                        if (plugin is AetherBar.Plugins.IPluginWithSettings pws)
+                        {
+                            var defs = pws.GetSettingDefinitions();
+                            foreach (var def in defs)
+                            {
+                                string val = null;
+                                if (ps?.CustomSettings != null) ps.CustomSettings.TryGetValue(def.Key, out val);
+                                pws.OnSettingChanged(def.Key, val ?? def.DefaultValue);
+                            }
+                        }
+
+                        // Initialize
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await plugin.InitializeAsync(context);
+                                Dispatcher.Invoke(RefreshSettings);
+                            }
+                            catch (Exception ex)
+                            {
+                                try { context.Log($"Dynamic init error for {plugin.Name}: {ex.Message}"); } catch { }
+                            }
+                        });
+                    }
+                    else if (!shouldBeEnabled && isRunning)
+                    {
+                        // Dynamically disable
+                        _runningPlugins.Remove(plugin);
+                        
+                        // Shutdown plugin
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await plugin.ShutdownAsync();
+                            }
+                            catch { }
+                        });
+
+                        // Remove active widgets associated with this plugin
+                        var widgetsToRemove = _activePluginWidgets.Where(w => w.Plugin == plugin).ToList();
+                        foreach (var widget in widgetsToRemove)
+                        {
+                            if (widget.Host.Parent is Panel parent)
+                            {
+                                parent.Children.Remove(widget.Host);
+                            }
+                            _activePluginWidgets.Remove(widget);
+                        }
+                    }
+                }
+            }
+
+            // Remove all plugin hosts from parent panels temporarily to prepare for sorting
+            foreach (var info in _activePluginWidgets)
+            {
+                if (info.Host.Parent is Panel parent)
+                {
+                    parent.Children.Remove(info.Host);
+                }
+            }
+
+            // Sort active widgets list
+            _activePluginWidgets.Sort((a, b) =>
+            {
+                var nameA = a.Plugin?.Name ?? a.WidgetName;
+                var nameB = b.Plugin?.Name ?? b.WidgetName;
+                
+                int orderA = s.Plugins != null && s.Plugins.TryGetValue(nameA, out var psA) ? psA.SortOrder : 0;
+                int orderB = s.Plugins != null && s.Plugins.TryGetValue(nameB, out var psB) ? psB.SortOrder : 0;
+                
+                return orderA.CompareTo(orderB);
+            });
+
+            // Update plugin layout and styling dynamically
+            foreach (var info in _activePluginWidgets)
+            {
+                var pluginName = info.Plugin?.Name ?? info.WidgetName;
+                
+                // Get setting for this plugin
+                PluginItemSettings? ps = null;
+                if (s.Plugins != null)
+                {
+                    s.Plugins.TryGetValue(pluginName, out ps);
+                }
+
+                var alignment = ps?.Alignment ?? "Right";
+                var padding = ps?.Padding ?? 6;
+                var width = ps?.Width ?? -1;
+
+                // Determine target panel
+                Panel targetPanel = PluginPanelRight;
+                if (alignment == "Left")
+                    targetPanel = PluginPanelLeft;
+                else if (alignment == "Center")
+                    targetPanel = PluginPanelCenter;
+
+                // Add to target panel
+                targetPanel.Children.Add(info.Host);
+
+                // Reset internal padding to safe original value to prevent text cropping
+                info.Host.Padding = new Thickness(6, 2, 6, 2);
+
+                // Apply horizontal shift using TranslateTransform
+                var translate = info.Host.RenderTransform as TranslateTransform;
+                if (translate == null)
+                {
+                    translate = new TranslateTransform();
+                    info.Host.RenderTransform = translate;
+                }
+                translate.X = padding; // Use padding setting as translation X offset
+
+                // Apply width and min-width
+                if (width > 0)
+                {
+                    info.Host.Width = width;
+                    info.Host.MinWidth = 0;
+                }
+                else
+                {
+                    info.Host.Width = double.NaN; // Auto / Default
+                    info.Host.MinWidth = Math.Min(info.DefaultWidth, 80);
+                }
+            }
 
             if (_embedded)
             {
@@ -288,6 +464,8 @@ public partial class MainWindow : Window
         _retryCount = 0;
         ShowInTaskbar = false;
         WindowStyle = WindowStyle.None;
+
+        InitializePluginsIfNeeded();
     }
 
     private void ScheduleRetry()
@@ -338,6 +516,319 @@ public partial class MainWindow : Window
         }
         catch
         {
+        }
+    }
+
+    private void InitializePluginsIfNeeded()
+    {
+        if (_pluginsInitialized) return;
+        try
+        {
+            _pluginManager = new AetherBar.Plugins.PluginManager();
+            var pluginsDir = Path.Combine(AppContext.BaseDirectory ?? ".", "plugins");
+            Directory.CreateDirectory(pluginsDir);
+            _pluginManager.LoadPluginsFromDirectory(pluginsDir);
+
+            try
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var dir = Path.Combine(appData, "AetherBar");
+                Directory.CreateDirectory(dir);
+                var logPath = Path.Combine(dir, "plugin.log");
+                File.AppendAllText(logPath, $"[{DateTime.Now:O}] Plugins discovered: {_pluginManager.Plugins.Count}\r\n");
+            }
+            catch { }
+
+            _pluginsInitialized = true;
+            RefreshSettings();
+        }
+        catch
+        {
+        }
+    }
+
+    private class PluginHostContext : AetherBar.Plugins.IPluginContext
+    {
+        private readonly TaskbarHooker _hooker;
+        private readonly Panel _container;
+        private readonly MainWindow _mainWindow;
+        public AetherBar.Plugins.IPlugin? CurrentPlugin { get; set; }
+
+        public PluginHostContext(TaskbarHooker hooker, nint anchor, Panel container, MainWindow mainWindow)
+        {
+            _hooker = hooker;
+            _container = container;
+            _mainWindow = mainWindow;
+        }
+
+        public nint TaskbarHwnd => _hooker.CurrentTaskbarInfo.TaskbarHwnd;
+
+        public AetherBar.Plugins.PluginWidget CreateWidget(string name, int width, int height)
+        {
+            try
+            {
+                try
+                {
+                    var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                    var dir = Path.Combine(appData, "AetherBar");
+                    Directory.CreateDirectory(dir);
+                    var logPath = Path.Combine(dir, "plugin.log");
+                    File.AppendAllText(logPath, $"[{DateTime.Now:O}] CreateWidget called: {name}\r\n");
+                }
+                catch { }
+
+                TextBlock topText = null!;
+                TextBlock bottomText = null!;
+                StackPanel stack = null!;
+                Border host = null!;
+                double currentFontSize = 11;
+
+                Brush? CreateColorBrush(string color)
+                {
+                    try
+                    {
+                        return new BrushConverter().ConvertFromString(color) as Brush;
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                }
+
+                void UpdateTextLayoutMetrics()
+                {
+                    topText.LineHeight = Math.Ceiling(currentFontSize * 1.35);
+                    bottomText.FontSize = Math.Max(6, currentFontSize - 2);
+                    bottomText.LineHeight = Math.Ceiling(bottomText.FontSize * 1.35);
+
+                    var contentHeight = bottomText.Visibility == Visibility.Visible
+                        ? topText.LineHeight + bottomText.LineHeight
+                        : topText.LineHeight;
+                    host.MinHeight = Math.Max(height, contentHeight + host.Padding.Top + host.Padding.Bottom);
+                }
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    topText = new TextBlock
+                    {
+                        Text = name,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(0, 0, 0, 0),
+                        Foreground = (Brush)Application.Current.Resources["TextPrimary"],
+                        FontSize = 11,
+                        LineHeight = 15,
+                        LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+                        FontWeight = FontWeights.SemiBold,
+                        TextAlignment = TextAlignment.Center
+                    };
+
+                    bottomText = new TextBlock
+                    {
+                        Text = string.Empty,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(0, -2, 0, 0),
+                        Foreground = (Brush)Application.Current.Resources["TextSecondary"],
+                        FontSize = 9,
+                        LineHeight = 13,
+                        LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+                        TextAlignment = TextAlignment.Center,
+                        Visibility = Visibility.Collapsed
+                    };
+
+                    stack = new StackPanel
+                    {
+                        Orientation = Orientation.Vertical,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                    };
+                    stack.Children.Add(topText);
+                    stack.Children.Add(bottomText);
+
+                    host = new Border
+                    {
+                        Width = double.NaN,
+                        MinWidth = Math.Min(width, 80),
+                        Height = double.NaN,
+                        MinHeight = height,
+                        Child = stack,
+                        Background = Brushes.Transparent,
+                        Padding = new Thickness(6, 2, 6, 2),
+                        CornerRadius = new CornerRadius(4),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        Margin = new Thickness(6, 0, 0, 0)
+                    };
+
+                    // append after existing children to chain plugins
+                    _container.Children.Add(host);
+                    try
+                    {
+                        var info = new ActivePluginWidgetInfo
+                        {
+                            Plugin = CurrentPlugin,
+                            WidgetName = name,
+                            Host = host,
+                            DefaultWidth = width
+                        };
+                        _mainWindow._activePluginWidgets.Add(info);
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Log($"Failed to register active widget info: {ex.Message}"); } catch { }
+                    }
+                    try { File.AppendAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AetherBar", "plugin.log"), $"[{DateTime.Now:O}] Container children after add: {_container.Children.Count}\r\n"); } catch { }
+                });
+
+                // log creation for diagnostics
+                try { Log($"Plugin host created: {name} (w:{width} h:{height})"); } catch { }
+
+                var widget = new AetherBar.Plugins.PluginWidget(name, width, height, s =>
+                {
+                    try
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            // Support two-line content: "CPU: x%\nRAM: y%" or inline form
+                            if (s.Contains("\n"))
+                            {
+                                var parts = s.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                                topText.Text = parts.Length > 0 ? parts[0].Trim() : string.Empty;
+                                bottomText.Text = parts.Length > 1 ? parts[1].Trim() : string.Empty;
+                            }
+                            else if (s.Contains("CPU:") && s.Contains("RAM:"))
+                            {
+                                // try split by RAM label
+                                var ramIndex = s.IndexOf("RAM:", StringComparison.OrdinalIgnoreCase);
+                                if (ramIndex > 0)
+                                {
+                                    topText.Text = s.Substring(0, ramIndex).Trim();
+                                    bottomText.Text = s.Substring(ramIndex).Trim();
+                                }
+                                else
+                                {
+                                    topText.Text = s;
+                                    bottomText.Text = string.Empty;
+                                }
+                            }
+                            else
+                            {
+                                topText.Text = s;
+                                bottomText.Text = string.Empty;
+                            }
+
+                            bottomText.Visibility = string.IsNullOrEmpty(bottomText.Text) 
+                                ? Visibility.Collapsed 
+                                : Visibility.Visible;
+                            UpdateTextLayoutMetrics();
+                        });
+                        try { Log($"Plugin widget update: {name} => {s}"); } catch { }
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Log($"Plugin widget update failed: {name} => {ex.Message}"); } catch { }
+                    }
+                }, size =>
+                {
+                    try
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            currentFontSize = size;
+                            topText.FontSize = size;
+                            UpdateTextLayoutMetrics();
+                        });
+                        try { Log($"Plugin widget font size update: {name} => {size}"); } catch { }
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Log($"Plugin widget font size update failed: {name} => {ex.Message}"); } catch { }
+                    }
+                }, offset =>
+                {
+                    try
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            var translate = host.RenderTransform as TranslateTransform;
+                            if (translate == null)
+                            {
+                                translate = new TranslateTransform();
+                                host.RenderTransform = translate;
+                            }
+                            translate.Y = offset;
+                        });
+                        try { Log($"Plugin widget vertical offset update: {name} => {offset}"); } catch { }
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Log($"Plugin widget vertical offset update failed: {name} => {ex.Message}"); } catch { }
+                    }
+                }, color =>
+                {
+                    try
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            var brush = CreateColorBrush(color);
+                            if (brush == null)
+                                return;
+
+                            topText.Foreground = brush;
+                            bottomText.Foreground = brush;
+                        });
+                        try { Log($"Plugin widget text color update: {name} => {color}"); } catch { }
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Log($"Plugin widget text color update failed: {name} => {ex.Message}"); } catch { }
+                    }
+                }, (topColor, bottomColor) =>
+                {
+                    try
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            var topBrush = CreateColorBrush(topColor);
+                            var bottomBrush = CreateColorBrush(bottomColor);
+
+                            if (topBrush != null)
+                                topText.Foreground = topBrush;
+                            if (bottomBrush != null)
+                                bottomText.Foreground = bottomBrush;
+                        });
+                        try { Log($"Plugin widget line color update: {name} => {topColor}, {bottomColor}"); } catch { }
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Log($"Plugin widget line color update failed: {name} => {ex.Message}"); } catch { }
+                    }
+                });
+
+                // no native handle when hosted in WPF panel; set handle to 0
+                widget.SetHandle(0);
+
+                return widget;
+            }
+            catch (Exception ex)
+            {
+                try { Log($"CreateWidget exception: {ex.Message}"); } catch { }
+                return new AetherBar.Plugins.PluginWidget(name, width, height);
+            }
+        }
+
+        public void Log(string message)
+        {
+            try
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var dir = Path.Combine(appData, "AetherBar");
+                Directory.CreateDirectory(dir);
+                var logPath = Path.Combine(dir, "plugin.log");
+                File.AppendAllText(logPath, $"[{DateTime.Now:O}] {message}\r\n");
+            }
+            catch { }
         }
     }
 

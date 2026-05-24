@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="6.0.0" />
+  </ItemGroup>
+
+  <Import Project="..\AetherBar.Plugins\AetherBar.Plugin.targets" />
+</Project>
