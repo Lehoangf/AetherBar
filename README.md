@@ -4,7 +4,7 @@
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![.NET](https://img.shields.io/badge/.NET-8.0-purple)
-![Platform](https://img.shields.io/badge/platform-Windows%2010%2020H1%2B-success)
+![Platform](https://img.shields.io/badge/platform-Windows%2011-success)
 
 ---
 
@@ -49,7 +49,7 @@ Native Win32 embedding via `SetParent` into `Shell_TrayWnd`:
 ### 🎨 Visual Effects
 | Effect | Support |
 |--------|---------|
-| **Acrylic (Blur)** | Windows 10+ via `SetWindowCompositionAttribute` |
+| **Acrylic (Blur)** | Windows 11 via `SetWindowCompositionAttribute` |
 | **Mica** | Windows 11+ via `DwmSetWindowAttribute` |
 | **Immersive Dark Mode** | Title bar + widget background |
 | **Corner Radius** | Configurable 0–12 px |
@@ -148,11 +148,9 @@ Taskbar Layout → WH_SHELL hook → TaskbarHooker.RefreshTaskbarInfo()
 
 ## Requirements
 
-- **OS:** Windows 10 20H1 (build 19041) or later (Windows 11 recommended for Mica)
+- **OS:** Windows 11
 - **Runtime:** [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
 - **Permission:** Must run as **Administrator** (required for `SetParent` into `Shell_TrayWnd`)
-
-> **Note:** The Mica backdrop effect is Windows 11–only and silently degrades on Windows 10. All other features (Acrylic, visualizer, media info, tray icon, settings) work fully on Windows 10.
 
 ---
 
