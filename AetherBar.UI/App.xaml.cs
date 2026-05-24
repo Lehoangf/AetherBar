@@ -14,6 +14,7 @@ namespace AetherBar.UI;
 public partial class App : Application
 {
     private SettingsManager? _settingsManager;
+    private SettingsWindow? _settingsWindow;
 
     public SettingsManager Settings => _settingsManager ??= new SettingsManager();
 
@@ -79,8 +80,14 @@ public partial class App : Application
 
     public void ShowSettingsWindow()
     {
-        var win = new SettingsWindow(_settingsManager!);
-        win.ShowDialog();
+        if (_settingsWindow is not null && _settingsWindow.IsLoaded)
+        {
+            _settingsWindow.Activate();
+            return;
+        }
+        _settingsWindow = new SettingsWindow(_settingsManager!);
+        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+        _settingsWindow.ShowDialog();
     }
 
     private void OnDispatcherUnhandledException(object sender,

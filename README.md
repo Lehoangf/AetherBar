@@ -8,6 +8,14 @@
 
 ---
 
+## Demo
+
+![AetherBar Demo](AetherBar.UI/Assets/demo.gif)
+
+*Audio visualizer running in the Windows taskbar with Bar, Line, Dot, and Circle modes.*
+
+---
+
 ## Features
 
 ### 🎵 Audio Visualizer
