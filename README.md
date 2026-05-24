@@ -12,14 +12,14 @@
 
 ![AetherBar Demo](AetherBar.UI/Assets/demo.gif)
 
-*Audio visualizer running in the Windows taskbar with Bar, Line, Dot, and Circle modes.*
+*Audio visualizer running in the Windows taskbar with 6 rendering modes.*
 
 ---
 
 ## Features
 
 ### 🎵 Audio Visualizer
-Real-time FFT audio visualization at 60fps directly in the taskbar using NAudio WASAPI loopback capture. Four rendering modes:
+Real-time FFT audio visualization at 60fps directly in the taskbar using NAudio WASAPI loopback capture. Six rendering modes:
 
 | Mode | Description |
 |------|-------------|
@@ -27,6 +27,8 @@ Real-time FFT audio visualization at 60fps directly in the taskbar using NAudio 
 | **Line** | Filled area under curve + thick outline + glow dots |
 | **Dot** | Glowing dot matrix in a grid layout (max 4 rows) |
 | **Circle** | Fan-shaped wedges radiating from bottom-center with center pulse |
+| **Mirror** | Bars mirrored symmetrically from center outward |
+| **Blocks** | Horizontal segmented blocks stacking vertically per frequency |
 
 **8 Color Themes:** Rainbow, Neon Blue, Matrix Green, Fire, Monochrome, Sunset, Ocean, Cyberpunk + Custom R/G/B sliders. Colors are applied left-to-right across the widget width.
 
@@ -100,7 +102,7 @@ AetherBar.slnx
 │   ├── Media/             — WinRT media metadata + DominantColorExtractor
 │   ├── Models/            — AudioData, MediaInfo, TaskbarInfo
 │   ├── Settings/          — AetherBarSettings (JSON persistence)
-│   └── Visualizer/        — IVisualizerRenderer + 4 modes + color engine
+│   └── Visualizer/        — IVisualizerRenderer + 6 modes + color engine
 ├── AetherBar.Hooker       — Win32 interop library
 │   ├── Interop/           — NativeMethods, DesktopWindowManager (DWM)
 │   ├── TaskbarHooker.cs   — Find Shell_TrayWnd, SetParent, positioning

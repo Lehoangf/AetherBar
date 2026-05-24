@@ -38,13 +38,38 @@ public class MediaManager : IDisposable
             var mediaInfo = GetMediaInfoFromSystem();
             if (mediaInfo != null)
             {
-                CurrentMedia = mediaInfo;
-                MediaInfoChanged?.Invoke(this, mediaInfo);
+                if (!AreSameState(CurrentMedia, mediaInfo))
+                {
+                    CurrentMedia = mediaInfo;
+                    MediaInfoChanged?.Invoke(this, mediaInfo);
+                }
+            }
+            else if (CurrentMedia.PlaybackStatus != MediaPlaybackStatus.Closed)
+            {
+                CurrentMedia = CreateClosedMediaInfo();
+                MediaInfoChanged?.Invoke(this, CurrentMedia);
             }
         }
         catch
         {
         }
+    }
+
+    private static bool AreSameState(MediaInfo left, MediaInfo right)
+    {
+        return left.PlaybackStatus == right.PlaybackStatus &&
+               string.Equals(left.Title, right.Title, StringComparison.Ordinal) &&
+               string.Equals(left.Artist, right.Artist, StringComparison.Ordinal) &&
+               string.Equals(left.Album, right.Album, StringComparison.Ordinal);
+    }
+
+    private static MediaInfo CreateClosedMediaInfo()
+    {
+        return new MediaInfo
+        {
+            Title = "No media playing",
+            PlaybackStatus = MediaPlaybackStatus.Closed
+        };
     }
 
     private MediaInfo? GetMediaInfoFromSystem()

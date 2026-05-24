@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private bool _mediaActive;
     private int _retryCount;
     private bool _hasAlbumArt;
+    private MediaInfo? _currentMedia;
 
     public MainWindow()
     {
@@ -115,6 +116,7 @@ public partial class MainWindow : Window
             if (media.PlaybackStatus == MediaPlaybackStatus.Playing)
             {
                 _mediaActive = true;
+                _currentMedia = media;
                 VisualizerControl.Visibility = Visibility.Visible;
 
                 if (media.AlbumArt != null && media.AlbumArt.Length > 0)
@@ -155,18 +157,18 @@ public partial class MainWindow : Window
                 {
                     SongInfoText.Visibility = Visibility.Collapsed;
                 }
+
+                ApplyBackgroundForCurrentState(media);
             }
             else
             {
                 _mediaActive = false;
                 _hasAlbumArt = false;
+                _currentMedia = null;
                 AlbumArtImage.Visibility = Visibility.Collapsed;
                 SongInfoText.Visibility = Visibility.Collapsed;
                 VisualizerControl.Visibility = Visibility.Visible;
-                var isDark = _settingsManager.Current.Effects.EnableDarkMode;
-                WidgetContainer.Background = isDark
-                    ? new SolidColorBrush(Color.FromArgb(34, 0, 0, 0))
-                    : new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+                ApplyBackgroundForCurrentState(null);
             }
         });
     }
@@ -206,27 +208,7 @@ public partial class MainWindow : Window
             }
 
             bool isDark = s.Effects.EnableDarkMode;
-
-            if (!_mediaActive)
-            {
-                if (isDark)
-                    WidgetContainer.Background = new SolidColorBrush(Color.FromArgb(34, 0, 0, 0));
-                else
-                    WidgetContainer.Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
-            }
-
-            switch (s.Effects.BackgroundEffect)
-            {
-                case "None":
-                    WidgetContainer.Background = Brushes.Transparent;
-                    break;
-                case "Acrylic (Blur)":
-                    WidgetContainer.Background = Brushes.Transparent;
-                    break;
-                case "Mica":
-                    WidgetContainer.Background = Brushes.Transparent;
-                    break;
-            }
+            ApplyBackgroundForCurrentState();
 
             SongInfoText.Foreground = GetTextColorBrush(s.Taskbar.WidgetTextColor,
                 s.Taskbar.WidgetTextColorR, s.Taskbar.WidgetTextColorG, s.Taskbar.WidgetTextColorB, isDark);
@@ -236,6 +218,9 @@ public partial class MainWindow : Window
                 var hwnd = new WindowInteropHelper(this).Handle;
                 switch (s.Effects.BackgroundEffect)
                 {
+                    case "None":
+                        DesktopWindowManager.DisableBackdrop(hwnd);
+                        break;
                     case "Acrylic (Blur)":
                         DesktopWindowManager.EnableAcrylic(hwnd);
                         break;
@@ -249,6 +234,36 @@ public partial class MainWindow : Window
         catch
         {
         }
+    }
+
+    private void ApplyBackgroundForCurrentState(MediaInfo? media = null)
+    {
+        var s = _settingsManager.Current;
+        var currentMedia = media ?? _currentMedia;
+
+        if (s.Effects.BackgroundEffect == "None")
+        {
+            WidgetContainer.Background = Brushes.Transparent;
+            return;
+        }
+
+        if (_mediaActive && currentMedia?.PlaybackStatus == MediaPlaybackStatus.Playing)
+        {
+            if (currentMedia.AlbumArt != null && currentMedia.AlbumArt.Length > 0 && s.Effects.AdaptiveTheme)
+            {
+                var color = DominantColorExtractor.ExtractFromBytes(currentMedia.AlbumArt);
+                WidgetContainer.Background = new SolidColorBrush(
+                    Color.FromArgb(40, color.R, color.G, color.B));
+                return;
+            }
+
+            WidgetContainer.Background = Brushes.Transparent;
+            return;
+        }
+
+        WidgetContainer.Background = s.Effects.EnableDarkMode
+            ? new SolidColorBrush(Color.FromArgb(34, 0, 0, 0))
+            : new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
     }
 
     private void TryEmbed()

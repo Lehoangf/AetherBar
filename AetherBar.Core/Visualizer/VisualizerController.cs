@@ -26,6 +26,8 @@ public class VisualizerController : IDisposable
         RegisterRenderer(new LineVisualizer());
         RegisterRenderer(new DotVisualizer());
         RegisterRenderer(new CircleVisualizer());
+        RegisterRenderer(new MirrorVisualizer());
+        RegisterRenderer(new BlocksVisualizer());
 
         SetMode("Bar");
     }

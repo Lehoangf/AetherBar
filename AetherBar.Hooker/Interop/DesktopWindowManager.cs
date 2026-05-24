@@ -62,6 +62,40 @@ public static class DesktopWindowManager
         }
     }
 
+    public static void DisableBackdrop(nint hwnd)
+    {
+        var accent = new AccentPolicy
+        {
+            AccentState = AccentState.ACCENT_DISABLED,
+            AccentFlags = 2,
+            GradientColor = 0,
+            AnimationId = 0
+        };
+
+        var accentStruct = Marshal.AllocHGlobal(Marshal.SizeOf(accent));
+        try
+        {
+            Marshal.StructureToPtr(accent, accentStruct, false);
+
+            var data = new WindowCompositionAttributeData
+            {
+                Attribute = WindowCompositionAttribute.WCA_ACCENT_POLICY,
+                Data = accentStruct,
+                SizeOfData = Marshal.SizeOf(accent)
+            };
+
+            SetWindowCompositionAttribute(hwnd, ref data);
+
+            int backdropType = (int)DWM_SYSTEMBACKDROP_TYPE.DWMSBT_NONE;
+            DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE,
+                ref backdropType, Marshal.SizeOf(typeof(int)));
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(accentStruct);
+        }
+    }
+
     [DllImport("dwmapi.dll", PreserveSig = true)]
     private static extern int DwmSetWindowAttribute(nint hwnd, uint dwAttribute, ref bool pvAttribute, int cbAttribute);
 

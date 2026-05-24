@@ -62,7 +62,7 @@ public partial class SettingsWindow : Window
         _loading = true;
         var s = _settingsManager.Current;
 
-        PopulateCombo(VisualizerModeCombo, "Bar", "Line", "Dot", "Circle");
+        PopulateCombo(VisualizerModeCombo, "Bar", "Line", "Dot", "Circle", "Mirror", "Blocks");
         VisualizerModeCombo.SelectionChanged += OnVisualizerModeChanged;
         PopulateCombo(ColorThemeCombo, "Rainbow", "Neon Blue", "Matrix Green", "Fire", "Monochrome", "Sunset", "Ocean", "Cyberpunk", "Custom");
         PopulateCombo(PositionCombo, "Left", "Center", "Right", "Auto");
