@@ -6,11 +6,15 @@
         Title="AetherBar"
         WindowStyle="None"
         AllowsTransparency="True"
-        Background="Transparent"
+        Background="#01000000"
         ShowInTaskbar="False"
         Topmost="True"
-        Width="180" Height="40"
-        Unloaded="OnUnloaded">
+        Width="180" Height="0"
+        Unloaded="OnUnloaded"
+        PreviewMouseDown="OnWidgetPreviewMouseDown"
+        PreviewMouseUp="OnWidgetPreviewMouseUp"
+        MouseEnter="OnWidgetMouseEnter"
+        MouseLeave="OnWidgetMouseLeave">
 <Grid>
         <tb:TaskbarIcon x:Name="TrayIcon"
                         ToolTipText="AetherBar"/>
@@ -18,7 +22,7 @@
             Background="#22000000"
             CornerRadius="4"
             Margin="2">
-        <Grid VerticalAlignment="Center">
+        <Grid VerticalAlignment="Center" ClipToBounds="True">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
@@ -28,13 +32,19 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Image x:Name="AlbumArtImage"
-                   Grid.Row="0" Grid.Column="0"
-                   Grid.RowSpan="2"
-                   Width="24" Height="24"
-                   Margin="3,0,2,0"
-                   VerticalAlignment="Center"
-                   Visibility="Collapsed"/>
+            <Border x:Name="AlbumArtBorder"
+                    Grid.Row="0" Grid.Column="0"
+                    Grid.RowSpan="2"
+                    Width="24" Height="24"
+                    Margin="3,0,2,0"
+                    VerticalAlignment="Center"
+                    Visibility="Collapsed"
+                    CornerRadius="4"
+                    Background="Transparent">
+                <Image x:Name="AlbumArtImage"
+                       Width="24" Height="24"
+                       Stretch="UniformToFill"/>
+            </Border>
 
             <vis:VisualizerControl x:Name="VisualizerControl"
                                    Grid.Row="0" Grid.Column="1"
@@ -64,13 +74,15 @@
                         HorizontalAlignment="Right"
                         Panel.ZIndex="2" />
 
-            <TextBlock x:Name="SongInfoText"
-                       Grid.Row="1" Grid.Column="1"
-                       FontSize="10"
-                       Foreground="#BBFFFFFF"
-                       TextTrimming="CharacterEllipsis"
-                       Margin="2,0,4,1"
-                       Visibility="Collapsed"/>
+            <Canvas x:Name="TitleClip"
+                    Grid.Row="1" Grid.Column="1"
+                    ClipToBounds="True"
+                    Margin="2,0,4,1">
+                <TextBlock x:Name="SongInfoText"
+                           FontSize="10"
+                           Foreground="#BBFFFFFF"
+                           Visibility="Collapsed"/>
+            </Canvas>
         </Grid>
     </Border>
     </Grid>

@@ -29,6 +29,11 @@ public class PluginWidget : IDisposable
     private Action<double>? _updateVerticalOffset;
     private Action<string>? _updateTextColor;
     private Action<string, string>? _updateLineColors;
+    private Action<string?>? _updateTooltip;
+
+    public Action<string, double, double>? OnMouseClick { get; set; }
+    public Action<string, double, double>? OnMouseDoubleClick { get; set; }
+    public Action<bool>? OnMouseHover { get; set; }
 
     public PluginWidget(
         string name, 
@@ -38,7 +43,8 @@ public class PluginWidget : IDisposable
         Action<double>? updateFontSize = null,
         Action<double>? updateVerticalOffset = null,
         Action<string>? updateTextColor = null,
-        Action<string, string>? updateLineColors = null)
+        Action<string, string>? updateLineColors = null,
+        Action<string?>? updateTooltip = null)
     {
         Name = name;
         Width = width;
@@ -48,6 +54,7 @@ public class PluginWidget : IDisposable
         _updateVerticalOffset = updateVerticalOffset;
         _updateTextColor = updateTextColor;
         _updateLineColors = updateLineColors;
+        _updateTooltip = updateTooltip;
     }
 
     public void SetHandle(nint handle) => Handle = handle;
@@ -117,6 +124,32 @@ public class PluginWidget : IDisposable
         }
     }
 
+    public void SetTooltip(string? text)
+    {
+        try
+        {
+            _updateTooltip?.Invoke(text);
+        }
+        catch
+        {
+        }
+    }
+
+    public void SetOnClickCallback(Action<string, double, double>? onClick)
+    {
+        OnMouseClick = onClick;
+    }
+
+    public void SetOnDoubleClickCallback(Action<string, double, double>? onDoubleClick)
+    {
+        OnMouseDoubleClick = onDoubleClick;
+    }
+
+    public void SetOnHoverCallback(Action<bool>? onHover)
+    {
+        OnMouseHover = onHover;
+    }
+
     public void Dispose()
     {
         if (Handle != 0)
@@ -134,14 +167,16 @@ public class PluginSettingDefinition
     public string Type { get; } // "string", "bool", "int", "double"
     public string DefaultValue { get; }
     public string? Description { get; }
+    public List<string>? Options { get; }
 
-    public PluginSettingDefinition(string key, string displayName, string type, string defaultValue, string? description = null)
+    public PluginSettingDefinition(string key, string displayName, string type, string defaultValue, string? description = null, List<string>? options = null)
     {
         Key = key;
         DisplayName = displayName;
         Type = type;
         DefaultValue = defaultValue;
         Description = description;
+        Options = options;
     }
 }
 

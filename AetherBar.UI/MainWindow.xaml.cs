@@ -1,11 +1,14 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AetherBar.Core.Audio;
@@ -35,6 +38,7 @@ public partial class MainWindow : Window
     private bool _hasAlbumArt;
     private MediaInfo? _currentMedia;
     private readonly HashSet<AetherBar.Plugins.IPlugin> _runningPlugins = new();
+    private Storyboard? _marqueeStoryboard;
 
     public class ActivePluginWidgetInfo
     {
@@ -140,7 +144,7 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            bool showMedia = _settingsManager.Current.Taskbar.ShowMediaInfo;
+            var s = _settingsManager.Current;
 
             if (media.PlaybackStatus == MediaPlaybackStatus.Playing)
             {
@@ -158,10 +162,10 @@ public partial class MainWindow : Window
                     bmp.StreamSource = ms;
                     bmp.EndInit();
                     AlbumArtImage.Source = bmp;
-                    AlbumArtImage.Visibility = showMedia ? Visibility.Visible : Visibility.Collapsed;
+                    ApplyAlbumArtSettings();
 
-                    if (_settingsManager.Current.Effects.AdaptiveTheme &&
-                        _settingsManager.Current.Effects.BackgroundEffect != "None")
+                    if (s.Effects.AdaptiveTheme &&
+                        s.Effects.BackgroundEffect != "None")
                     {
                         var color = DominantColorExtractor.ExtractFromBytes(media.AlbumArt);
                         WidgetContainer.Background = new SolidColorBrush(
@@ -171,20 +175,22 @@ public partial class MainWindow : Window
                 else
                 {
                     _hasAlbumArt = false;
-                    AlbumArtImage.Visibility = Visibility.Collapsed;
+                    ApplyAlbumArtSettings();
                 }
 
-                if (showMedia)
+                if (s.Taskbar.ShowSongTitle)
                 {
                     var info = string.IsNullOrEmpty(media.Artist)
                         ? media.Title
                         : $"{media.Artist} - {media.Title}";
                     SongInfoText.Text = info;
                     SongInfoText.Visibility = Visibility.Visible;
+                    StartMarquee();
                 }
                 else
                 {
                     SongInfoText.Visibility = Visibility.Collapsed;
+                    StopMarquee();
                 }
 
                 ApplyBackgroundForCurrentState(media);
@@ -194,8 +200,9 @@ public partial class MainWindow : Window
                 _mediaActive = false;
                 _hasAlbumArt = false;
                 _currentMedia = null;
-                AlbumArtImage.Visibility = Visibility.Collapsed;
+                ApplyAlbumArtSettings();
                 SongInfoText.Visibility = Visibility.Collapsed;
+                StopMarquee();
                 VisualizerControl.Visibility = Visibility.Visible;
                 ApplyBackgroundForCurrentState(null);
             }
@@ -212,14 +219,26 @@ public partial class MainWindow : Window
                 Width = s.Taskbar.WidgetWidth;
                 RepositionWidget();
             }
-            WidgetContainer.Padding = new Thickness(s.Taskbar.WidgetPadding);
+            WidgetContainer.Padding = new Thickness(s.Taskbar.WidgetPaddingX, s.Taskbar.WidgetPaddingY, s.Taskbar.WidgetPaddingX, s.Taskbar.WidgetPaddingY);
             WidgetContainer.CornerRadius = new CornerRadius(s.Effects.CornerRadius);
             var widgetScale = Math.Clamp(s.Taskbar.WidgetWidth / 180.0, 0.85, 1.25);
             SongInfoText.FontSize = 10 * widgetScale;
-            bool showMedia = s.Taskbar.ShowMediaInfo;
-            SongInfoText.Visibility = showMedia && _mediaActive ? Visibility.Visible : Visibility.Collapsed;
-            AlbumArtImage.Visibility = showMedia && _hasAlbumArt ? Visibility.Visible : Visibility.Collapsed;
+            bool showTitle = s.Taskbar.ShowSongTitle && _mediaActive;
+            SongInfoText.Visibility = showTitle ? Visibility.Visible : Visibility.Collapsed;
+            if (showTitle)
+                StartMarquee();
+            else
+                StopMarquee();
             _visualizer?.SetMode(s.Visualizer.Mode);
+            ApplyAlbumArtSettings();
+
+            VisualizerControl.Height = s.Taskbar.VisualizerHeight;
+            double contentH = s.Taskbar.VisualizerHeight;
+            if (s.Taskbar.ShowSongTitle && _mediaActive)
+                contentH += 14;
+            Height = WidgetContainer.Margin.Top + WidgetContainer.Margin.Bottom
+                     + s.Taskbar.WidgetPaddingY * 2
+                     + contentH;
 
             if (_visualizer != null)
             {
@@ -452,6 +471,79 @@ public partial class MainWindow : Window
         WidgetContainer.Background = s.Effects.EnableDarkMode
             ? new SolidColorBrush(Color.FromArgb(34, 0, 0, 0))
             : new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+    }
+
+    private void ApplyAlbumArtSettings()
+    {
+        var s = _settingsManager?.Current;
+        if (s == null) return;
+
+        bool visible = s.Taskbar.ShowAlbumArt && _hasAlbumArt;
+
+        AlbumArtBorder.Width = s.Taskbar.AlbumArtSize;
+        AlbumArtBorder.Height = s.Taskbar.AlbumArtSize;
+        AlbumArtBorder.CornerRadius = new CornerRadius(s.Taskbar.AlbumArtCornerRadius);
+        AlbumArtBorder.Opacity = s.Taskbar.AlbumArtOpacity;
+        AlbumArtBorder.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+
+        AlbumArtImage.Width = s.Taskbar.AlbumArtSize;
+        AlbumArtImage.Height = s.Taskbar.AlbumArtSize;
+        AlbumArtImage.Visibility = Visibility.Visible;
+    }
+
+    private void StartMarquee()
+    {
+        StopMarquee();
+
+        if (string.IsNullOrEmpty(SongInfoText.Text) ||
+            SongInfoText.Visibility != Visibility.Visible)
+            return;
+
+        SongInfoText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        TitleClip.Height = SongInfoText.DesiredSize.Height;
+
+        double containerWidth = TitleClip.ActualWidth;
+        double textWidth = SongInfoText.DesiredSize.Width;
+
+        if (containerWidth <= 0 || textWidth <= 0)
+        {
+            Dispatcher.BeginInvoke(StartMarquee, DispatcherPriority.Background);
+            return;
+        }
+
+        if (textWidth <= containerWidth + 2)
+            return;
+
+        double distance = textWidth - containerWidth + 4;
+        double scrollTime = Math.Max(3, distance / 30);
+        double pauseTime = 1.5;
+
+        Canvas.SetLeft(SongInfoText, 0);
+
+        var anim = new DoubleAnimationUsingKeyFrames
+        {
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+
+        anim.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0))));
+        anim.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(pauseTime))));
+        anim.KeyFrames.Add(new LinearDoubleKeyFrame(-distance, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(pauseTime + scrollTime))));
+        anim.KeyFrames.Add(new LinearDoubleKeyFrame(-distance, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(pauseTime + scrollTime + pauseTime))));
+        anim.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(pauseTime + scrollTime + pauseTime + scrollTime))));
+
+        Storyboard.SetTarget(anim, SongInfoText);
+        Storyboard.SetTargetProperty(anim, new PropertyPath("(Canvas.Left)"));
+
+        _marqueeStoryboard = new Storyboard();
+        _marqueeStoryboard.Children.Add(anim);
+        _marqueeStoryboard.Begin();
+    }
+
+    private void StopMarquee()
+    {
+        _marqueeStoryboard?.Stop();
+        _marqueeStoryboard = null;
+        Canvas.SetLeft(SongInfoText, 0);
     }
 
     private void TryEmbed()
@@ -816,10 +908,38 @@ public partial class MainWindow : Window
                     {
                         try { Log($"Plugin widget line color update failed: {name} => {ex.Message}"); } catch { }
                     }
+                }, tooltip =>
+                {
+                    try
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            host.ToolTip = tooltip;
+                        });
+                    }
+                    catch { }
                 });
 
                 // no native handle when hosted in WPF panel; set handle to 0
                 widget.SetHandle(0);
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    if (host != null)
+                    {
+                        host.MouseDown += (s, me) =>
+                        {
+                            var pos = me.GetPosition(host);
+                            var btn = me.ChangedButton.ToString();
+                            if (me.ClickCount >= 2)
+                                widget.OnMouseDoubleClick?.Invoke(btn, pos.X, pos.Y);
+                            else
+                                widget.OnMouseClick?.Invoke(btn, pos.X, pos.Y);
+                        };
+                        host.MouseEnter += (s, me) => widget.OnMouseHover?.Invoke(true);
+                        host.MouseLeave += (s, me) => widget.OnMouseHover?.Invoke(false);
+                    }
+                });
 
                 return widget;
             }
@@ -859,6 +979,69 @@ public partial class MainWindow : Window
         _hooker?.Dispose();
     }
 
+    public event Action<string, double, double>? OnWidgetMouseClick;
+    public event Action<string, double, double>? OnWidgetMouseDoubleClick;
+    public event Action<bool>? OnWidgetMouseHover;
+
+    private void OnWidgetPreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        var pos = e.GetPosition(this);
+        var btn = e.ChangedButton.ToString();
+
+        if (e.ChangedButton == MouseButton.Right || e.ChangedButton == MouseButton.Middle)
+        {
+            var rightClickAction = _settingsManager?.Current.Taskbar.RightClickAction ?? "menu";
+            if (rightClickAction == "menu")
+            {
+                ShowTrayMenu();
+                e.Handled = true;
+            }
+            return;
+        }
+
+        if (e.ClickCount >= 2)
+        {
+            OnWidgetMouseDoubleClick?.Invoke(btn, pos.X, pos.Y);
+            var dcAction = _settingsManager?.Current.Taskbar.DoubleClickAction ?? "settings";
+            var dcValue = _settingsManager?.Current.Taskbar.DoubleClickValue ?? "";
+            HandleWidgetAction(dcAction, dcValue);
+        }
+        else
+        {
+            OnWidgetMouseClick?.Invoke(btn, pos.X, pos.Y);
+        }
+    }
+
+    private void OnWidgetPreviewMouseUp(object sender, MouseButtonEventArgs e)
+    {
+    }
+
+    private static void HandleWidgetAction(string action, string value)
+    {
+        switch (action)
+        {
+            case "settings":
+                ((App)Application.Current).ShowSettingsWindow();
+                break;
+            case "url" when !string.IsNullOrEmpty(value):
+                try { Process.Start(new ProcessStartInfo { FileName = value, UseShellExecute = true }); } catch { }
+                break;
+            case "run" when !string.IsNullOrEmpty(value):
+                try { Process.Start(new ProcessStartInfo { FileName = value, UseShellExecute = true }); } catch { }
+                break;
+        }
+    }
+
+    private void OnWidgetMouseEnter(object sender, MouseEventArgs e)
+    {
+        OnWidgetMouseHover?.Invoke(true);
+    }
+
+    private void OnWidgetMouseLeave(object sender, MouseEventArgs e)
+    {
+        OnWidgetMouseHover?.Invoke(false);
+    }
+
     private void OnTrayShowHide(object sender, RoutedEventArgs e)
     {
         if (Visibility == Visibility.Visible)
@@ -882,7 +1065,7 @@ public partial class MainWindow : Window
         {
             try
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                Process.Start(new ProcessStartInfo
                 {
                     FileName = exePath,
                     UseShellExecute = true

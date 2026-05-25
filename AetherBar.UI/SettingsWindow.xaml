@@ -233,6 +233,19 @@
                                               Margin="0,16,0,0"
                                               Checked="OnSettingChanged"
                                               Unchecked="OnSettingChanged"/>
+
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="VISUALIZER HEIGHT" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                        <TextBlock x:Name="VisualizerHeightValue" Text="22" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                    </Grid>
+                                    <Slider x:Name="VisualizerHeightSlider"
+                                            
+                                            Minimum="10" Maximum="48" TickFrequency="2"
+                                            ValueChanged="OnSettingChanged"/>
                                 </StackPanel>
                             </Border>
 
@@ -287,22 +300,35 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="WIDGET PADDING" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
-                                        <TextBlock x:Name="PaddingValue" Text="2" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                        <TextBlock Text="PADDING HORIZONTAL" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                        <TextBlock x:Name="PaddingXValue" Text="2" Style="{StaticResource SliderValue}" Grid.Column="1"/>
                                     </Grid>
-                                    <Slider x:Name="PaddingSlider"
+                                    <Slider x:Name="PaddingXSlider"
+                                            
+                                            Minimum="0" Maximum="20" TickFrequency="1"
+                                            ValueChanged="OnSettingChanged"/>
+
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="PADDING VERTICAL" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                        <TextBlock x:Name="PaddingYValue" Text="2" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                    </Grid>
+                                    <Slider x:Name="PaddingYSlider"
                                             
                                             Minimum="0" Maximum="20" TickFrequency="1"
                                             ValueChanged="OnSettingChanged"/>
                                 </StackPanel>
                             </Border>
 
-                            <!-- Card: Display -->
+                            <!-- Card: Title -->
                             <Border Style="{StaticResource FluentCard}">
                                 <StackPanel>
-                                    <TextBlock Text="DISPLAY" Style="{StaticResource CardTitle}"/>
-                                    <CheckBox x:Name="ShowMediaInfoCheck"
-                                              Content="Show Media Info"
+                                    <TextBlock Text="TITLE" Style="{StaticResource CardTitle}"/>
+                                    <CheckBox x:Name="ShowSongTitleCheck"
+                                              Content="Show Song Title"
                                               
                                               Checked="OnSettingChanged"
                                               Unchecked="OnSettingChanged"/>
@@ -377,6 +403,83 @@
                                               
                                               Checked="OnSettingChanged"
                                               Unchecked="OnSettingChanged"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card: Album Art -->
+                            <Border Style="{StaticResource FluentCard}">
+                                <StackPanel>
+                                    <TextBlock Text="ALBUM ART" Style="{StaticResource CardTitle}"/>
+                                    <CheckBox x:Name="ShowAlbumArtCheck"
+                                              Content="Show Album Art"
+                                              
+                                              Checked="OnSettingChanged"
+                                              Unchecked="OnSettingChanged"/>
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="SIZE" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                        <TextBlock x:Name="AlbumArtSizeValue" Text="24" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                    </Grid>
+                                    <Slider x:Name="AlbumArtSizeSlider"
+                                            
+                                            Minimum="16" Maximum="48" TickFrequency="2"
+                                            ValueChanged="OnSettingChanged"/>
+
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="CORNER RADIUS" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                        <TextBlock x:Name="AlbumArtRadiusValue" Text="4" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                    </Grid>
+                                    <Slider x:Name="AlbumArtRadiusSlider"
+                                            
+                                            Minimum="0" Maximum="24" TickFrequency="1"
+                                            ValueChanged="OnSettingChanged"/>
+
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="OPACITY" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                        <TextBlock x:Name="AlbumArtOpacityValue" Text="1.0" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                    </Grid>
+                                    <Slider x:Name="AlbumArtOpacitySlider"
+                                            
+                                            Minimum="0.1" Maximum="1.0" TickFrequency="0.1"
+                                            ValueChanged="OnSettingChanged"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card: Widget Events -->
+                            <Border Style="{StaticResource FluentCard}">
+                                <StackPanel>
+                                    <TextBlock Text="WIDGET EVENTS" Style="{StaticResource CardTitle}"/>
+                                    <TextBlock Text="DOUBLE-CLICK ACTION" Style="{StaticResource SectionHeader}"/>
+                                    <ComboBox x:Name="DoubleClickActionCombo"
+                                              
+                                              SelectedIndex="0"
+                                              SelectionChanged="OnSettingChanged"/>
+                                    <TextBox x:Name="DoubleClickValueBox"
+                                             Text=""
+                                             Height="32" Padding="8,4" FontSize="13"
+                                             VerticalContentAlignment="Center"
+                                             Margin="0,6,0,0"
+                                             TextChanged="OnSettingChanged"
+                                             Visibility="Collapsed"
+                                             Background="{DynamicResource WindowBackground}"
+                                             Foreground="{DynamicResource TextPrimary}"
+                                             BorderBrush="{DynamicResource CardBorder}" BorderThickness="1"/>
+                                    <TextBlock Text="RIGHT-CLICK ACTION" Style="{StaticResource SectionHeader}" Margin="0,12,0,0"/>
+                                    <ComboBox x:Name="RightClickActionCombo"
+                                              
+                                              SelectedIndex="0"
+                                              SelectionChanged="OnSettingChanged"/>
                                 </StackPanel>
                             </Border>
 
