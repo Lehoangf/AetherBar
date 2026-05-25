@@ -45,13 +45,22 @@ public class TaskbarSettings
     public string Position { get; set; } = "Auto";
     public int OffsetX { get; set; } = 0;
     public bool ShowClock { get; set; } = true;
-    public bool ShowMediaInfo { get; set; } = true;
+    public bool ShowSongTitle { get; set; } = true;
+    public bool ShowAlbumArt { get; set; } = true;
     public bool AutoHide { get; set; } = false;
-    public int WidgetPadding { get; set; } = 2;
+    public int WidgetPaddingX { get; set; } = 2;
+    public int WidgetPaddingY { get; set; } = 2;
     public string WidgetTextColor { get; set; } = "Auto";
     public int WidgetTextColorR { get; set; } = 255;
     public int WidgetTextColorG { get; set; } = 255;
     public int WidgetTextColorB { get; set; } = 255;
+    public string DoubleClickAction { get; set; } = "settings";
+    public string DoubleClickValue { get; set; } = "";
+    public string RightClickAction { get; set; } = "menu";
+    public int AlbumArtSize { get; set; } = 24;
+    public int AlbumArtCornerRadius { get; set; } = 4;
+    public double AlbumArtOpacity { get; set; } = 1.0;
+    public int VisualizerHeight { get; set; } = 22;
 }
 
 public class EffectsSettings

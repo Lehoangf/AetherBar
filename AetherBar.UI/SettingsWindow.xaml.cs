@@ -72,12 +72,16 @@ public partial class SettingsWindow : Window
         PopulateCombo(PositionCombo, "Left", "Center", "Right", "Auto");
         PopulateCombo(BgEffectCombo, "None", "Acrylic (Blur)", "Mica");
         PopulateCombo(WidgetTextColorCombo, "Auto", "White", "Black", "Red", "Green", "Blue", "Cyan", "Yellow", "Custom");
+        PopulateCombo(DoubleClickActionCombo, "nothing", "settings", "url", "run");
+        PopulateCombo(RightClickActionCombo, "menu", "nothing");
 
         BlockComboScroll(VisualizerModeCombo);
         BlockComboScroll(ColorThemeCombo);
         BlockComboScroll(PositionCombo);
         BlockComboScroll(BgEffectCombo);
         BlockComboScroll(WidgetTextColorCombo);
+        BlockComboScroll(DoubleClickActionCombo);
+        BlockComboScroll(RightClickActionCombo);
 
         SelectItem(VisualizerModeCombo, s.Visualizer.Mode);
         var mode = GetSelected(VisualizerModeCombo);
@@ -97,8 +101,11 @@ public partial class SettingsWindow : Window
         SelectItem(PositionCombo, s.Taskbar.Position);
         WidthSlider.Value = s.Taskbar.WidgetWidth;
         OffsetSlider.Value = s.Taskbar.OffsetX;
-        PaddingSlider.Value = s.Taskbar.WidgetPadding;
-        ShowMediaInfoCheck.IsChecked = s.Taskbar.ShowMediaInfo;
+        PaddingXSlider.Value = s.Taskbar.WidgetPaddingX;
+        PaddingYSlider.Value = s.Taskbar.WidgetPaddingY;
+        VisualizerHeightSlider.Value = s.Taskbar.VisualizerHeight;
+        ShowSongTitleCheck.IsChecked = s.Taskbar.ShowSongTitle;
+        ShowAlbumArtCheck.IsChecked = s.Taskbar.ShowAlbumArt;
         AutoHideCheck.IsChecked = s.Taskbar.AutoHide;
         SelectItem(WidgetTextColorCombo, s.Taskbar.WidgetTextColor);
         WidgetTextRSlider.Value = s.Taskbar.WidgetTextColorR;
@@ -106,6 +113,15 @@ public partial class SettingsWindow : Window
         WidgetTextBSlider.Value = s.Taskbar.WidgetTextColorB;
         UpdateWidgetTextColorPanel();
         UpdateWidgetTextPreview();
+
+        AlbumArtSizeSlider.Value = s.Taskbar.AlbumArtSize;
+        AlbumArtRadiusSlider.Value = s.Taskbar.AlbumArtCornerRadius;
+        AlbumArtOpacitySlider.Value = s.Taskbar.AlbumArtOpacity;
+
+        SelectItem(DoubleClickActionCombo, s.Taskbar.DoubleClickAction);
+        DoubleClickValueBox.Text = s.Taskbar.DoubleClickValue ?? "";
+        UpdateDoubleClickValueVisibility();
+        SelectItem(RightClickActionCombo, s.Taskbar.RightClickAction);
 
         SelectItem(BgEffectCombo, s.Effects.BackgroundEffect);
         CornerRadiusSlider.Value = s.Effects.CornerRadius;
@@ -211,8 +227,11 @@ public partial class SettingsWindow : Window
             s.Taskbar.Position = GetSelected(PositionCombo);
             s.Taskbar.WidgetWidth = (int)WidthSlider.Value;
             s.Taskbar.OffsetX = (int)OffsetSlider.Value;
-            s.Taskbar.WidgetPadding = (int)PaddingSlider.Value;
-            s.Taskbar.ShowMediaInfo = ShowMediaInfoCheck.IsChecked ?? true;
+            s.Taskbar.WidgetPaddingX = (int)PaddingXSlider.Value;
+            s.Taskbar.WidgetPaddingY = (int)PaddingYSlider.Value;
+            s.Taskbar.VisualizerHeight = (int)VisualizerHeightSlider.Value;
+            s.Taskbar.ShowSongTitle = ShowSongTitleCheck.IsChecked ?? true;
+            s.Taskbar.ShowAlbumArt = ShowAlbumArtCheck.IsChecked ?? true;
             s.Taskbar.AutoHide = AutoHideCheck.IsChecked ?? false;
             s.Taskbar.WidgetTextColor = GetSelected(WidgetTextColorCombo);
             s.Taskbar.WidgetTextColorR = (int)WidgetTextRSlider.Value;
@@ -225,6 +244,15 @@ public partial class SettingsWindow : Window
             s.Effects.CornerRadius = (int)CornerRadiusSlider.Value;
             s.Effects.AdaptiveTheme = AdaptiveThemeCheck.IsChecked ?? true;
             s.Effects.EnableDarkMode = DarkModeCheck.IsChecked ?? true;
+
+            s.Taskbar.AlbumArtSize = (int)AlbumArtSizeSlider.Value;
+            s.Taskbar.AlbumArtCornerRadius = (int)AlbumArtRadiusSlider.Value;
+            s.Taskbar.AlbumArtOpacity = AlbumArtOpacitySlider.Value;
+
+            s.Taskbar.DoubleClickAction = GetSelected(DoubleClickActionCombo);
+            s.Taskbar.DoubleClickValue = DoubleClickValueBox.Text;
+            UpdateDoubleClickValueVisibility();
+            s.Taskbar.RightClickAction = GetSelected(RightClickActionCombo);
 
             s.General.StartWithWindows = StartWithWindowsCheck.IsChecked ?? false;
             s.General.StartMinimized = StartMinimizedCheck.IsChecked ?? true;
@@ -272,6 +300,13 @@ public partial class SettingsWindow : Window
         WidgetTextColorPreview.Background = new SolidColorBrush(Color.FromRgb(pr, pg, pb));
     }
 
+    private void UpdateDoubleClickValueVisibility()
+    {
+        var action = GetSelected(DoubleClickActionCombo);
+        DoubleClickValueBox.Visibility = (action == "url" || action == "run")
+            ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void UpdateSliderValueLabels()
     {
         OpacityValue.Text = OpacitySlider.Value.ToString("0.0");
@@ -281,7 +316,12 @@ public partial class SettingsWindow : Window
         BarStartOffsetValue.Text = ((int)BarStartOffsetSlider.Value).ToString();
         WidthValue.Text = ((int)WidthSlider.Value).ToString();
         OffsetValue.Text = ((int)OffsetSlider.Value).ToString();
-        PaddingValue.Text = ((int)PaddingSlider.Value).ToString();
+        PaddingXValue.Text = ((int)PaddingXSlider.Value).ToString();
+        PaddingYValue.Text = ((int)PaddingYSlider.Value).ToString();
+        AlbumArtSizeValue.Text = ((int)AlbumArtSizeSlider.Value).ToString();
+        AlbumArtRadiusValue.Text = ((int)AlbumArtRadiusSlider.Value).ToString();
+        AlbumArtOpacityValue.Text = AlbumArtOpacitySlider.Value.ToString("0.0");
+        VisualizerHeightValue.Text = ((int)VisualizerHeightSlider.Value).ToString();
         CornerRadiusValue.Text = ((int)CornerRadiusSlider.Value).ToString();
     }
 
@@ -620,21 +660,46 @@ public partial class SettingsWindow : Window
                     };
                     panel.Children.Add(header);
 
-                    var tb = new TextBox
+                    if (def.Options != null && def.Options.Count > 0)
                     {
-                        Text = currentValue,
-                        Height = 32,
-                        Padding = new Thickness(8, 4, 8, 4),
-                        FontSize = 13,
-                        VerticalContentAlignment = VerticalAlignment.Center,
-                        Background = (Brush)Application.Current.Resources["WindowBackground"],
-                        Foreground = (Brush)Application.Current.Resources["TextPrimary"],
-                        BorderBrush = (Brush)Application.Current.Resources["CardBorder"],
-                        BorderThickness = new Thickness(1),
-                    };
-                    
-                    tb.TextChanged += (s, e) => SaveCustomSetting(pluginName, def.Key, tb.Text);
-                    panel.Children.Add(tb);
+                        var combo = new ComboBox
+                        {
+                            Height = 32,
+                            FontSize = 13,
+                            Padding = new Thickness(4, 0, 4, 0),
+                            VerticalContentAlignment = VerticalAlignment.Center,
+                            Background = (Brush)Application.Current.Resources["WindowBackground"],
+                            Foreground = (Brush)Application.Current.Resources["TextPrimary"],
+                            BorderBrush = (Brush)Application.Current.Resources["CardBorder"],
+                            BorderThickness = new Thickness(1),
+                            ItemsSource = def.Options,
+                            SelectedItem = currentValue
+                        };
+                        combo.SelectionChanged += (s, e) =>
+                        {
+                            if (combo.SelectedItem is string val)
+                                SaveCustomSetting(pluginName, def.Key, val);
+                        };
+                        panel.Children.Add(combo);
+                    }
+                    else
+                    {
+                        var tb = new TextBox
+                        {
+                            Text = currentValue,
+                            Height = 32,
+                            Padding = new Thickness(8, 4, 8, 4),
+                            FontSize = 13,
+                            VerticalContentAlignment = VerticalAlignment.Center,
+                            Background = (Brush)Application.Current.Resources["WindowBackground"],
+                            Foreground = (Brush)Application.Current.Resources["TextPrimary"],
+                            BorderBrush = (Brush)Application.Current.Resources["CardBorder"],
+                            BorderThickness = new Thickness(1),
+                        };
+
+                        tb.TextChanged += (s, e) => SaveCustomSetting(pluginName, def.Key, tb.Text);
+                        panel.Children.Add(tb);
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(def.Description))

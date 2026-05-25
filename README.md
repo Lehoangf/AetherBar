@@ -68,8 +68,8 @@ Native Win32 embedding via `SetParent` into `Shell_TrayWnd`:
 ### ⚙️ Settings Dashboard
 Fluent Design settings window with 4 tabs. Every change applies live — no Save button needed.
 
-- **Visualizer tab:** Mode, Color Theme, Custom Color (R/G/B sliders), Opacity, Bar Count, Sensitivity, Threshold, Bar Start Offset, Show Peak
-- **Taskbar tab:** Position, Widget Width, Horizontal Offset, Widget Padding, Show Media Info, Text Color (Auto/White/Black/Red/Green/Blue/Cyan/Yellow/Custom + R/G/B), Auto-hide
+- **Visualizer tab:** Mode, Color Theme, Custom Color (R/G/B sliders), Opacity, Bar Count, Sensitivity, Threshold, Bar Start Offset, Show Peak, Visualizer Height
+- **Taskbar tab:** Position, Widget Width, Horizontal Offset, Widget Padding, Show Song Title, Show Album Art, Album Art (Size/Corner Radius/Opacity), Text Color (Auto/White/Black/Red/Green/Blue/Cyan/Yellow/Custom + R/G/B), Auto-hide
 - **Effects tab:** Background Effect (None/Acrylic/Mica), Corner Radius, Adaptive Theme
 - **General tab:** Start with Windows, Start Minimized (tray only), Dark Mode, Game Mode, Check for Updates, Reset to Defaults
 
@@ -223,6 +223,7 @@ Settings are persisted as JSON at `%LOCALAPPDATA%\AetherBar\settings.json`.
 | ColorTheme | "Rainbow" | 9 themes |
 | Opacity | 0.5 | 0.1–1.0 |
 | ShowPeak | true | bool |
+| VisualizerHeight | 22 | 10–48 |
 
 ### Taskbar
 
@@ -233,6 +234,11 @@ Settings are persisted as JSON at `%LOCALAPPDATA%\AetherBar\settings.json`.
 | OffsetX | 0 | –100 – 2000 |
 | WidgetPadding | 2 | 0–20 |
 | WidgetTextColor | "Auto" | Auto/White/Black/Red/Green/Blue/Cyan/Yellow/Custom |
+| ShowSongTitle | true | bool |
+| ShowAlbumArt | true | bool |
+| AlbumArtSize | 24 | 16–48 |
+| AlbumArtCornerRadius | 4 | 0–24 |
+| AlbumArtOpacity | 1.0 | 0.1–1.0 |
 
 ### Effects
 
@@ -282,6 +288,24 @@ Plugins may also expose their own settings through `IPluginWithSettings`.
 | 3 — Visualizer rendering (Bar/Line/Dot/Circle), tray icon | ✅ |
 | 4 — Settings dashboard, Acrylic/Mica, dark/light theme | ✅ |
 | 5 — Plugin marketplace, scripting support | 🔜 |
+
+---
+
+## Changelog
+
+### v0.2.2 (2026-05-25)
+- **Album Art Settings**: Configurable size (16–48px), corner radius, and opacity
+- **Visualizer Height**: Adjustable height slider (10–48px), window auto-sizes to content
+- **Separate Media Controls**: Independent toggles for "Show Song Title" and "Show Album Art"
+- **Marquee Scrolling**: Long song titles now scroll left-right with pause at each end
+- **Plugin improvements**: Better lifecycle, non-nullable refactoring, async initialization
+- **Bug fixes**: Mode switching, audio freeze workaround, adaptive theme timing
+
+### v0.2.1
+- Restart tray option, audio freeze fix
+
+### v0.2.0
+- Initial public release
 
 ---
 
