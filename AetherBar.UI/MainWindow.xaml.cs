@@ -97,6 +97,18 @@ public partial class MainWindow : Window
             catch
             {
             }
+
+            try
+            {
+                if (_audioManager != null && _audioManager.HasReceivedData &&
+                    (DateTime.UtcNow - _audioManager.LastDataTime).TotalSeconds > 3)
+                {
+                    _audioManager.RestartCapture();
+                }
+            }
+            catch
+            {
+            }
         };
         _positionTimer.Start();
 
@@ -863,6 +875,24 @@ public partial class MainWindow : Window
         ((App)Application.Current).ShowSettingsWindow();
     }
 
+    private void OnTrayRestart(object sender, RoutedEventArgs e)
+    {
+        var exePath = Environment.ProcessPath;
+        if (exePath != null)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = exePath,
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        }
+        Application.Current.Shutdown();
+    }
+
     private void OnTrayExit(object sender, RoutedEventArgs e)
     {
         Application.Current.Shutdown();
@@ -930,6 +960,7 @@ public partial class MainWindow : Window
 
         menu.Items.Add(MakeTrayItem("Show/Hide", OnTrayShowHide, menu));
         menu.Items.Add(MakeTrayItem("Settings", OnTraySettings, menu));
+        menu.Items.Add(MakeTrayItem("Restart", OnTrayRestart, menu));
         menu.Items.Add(new Separator());
         menu.Items.Add(MakeTrayItem("Exit", OnTrayExit, menu));
 

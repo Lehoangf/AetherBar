@@ -1,3 +1,4 @@
+using System.Threading;
 using NAudio.Wave;
 using NAudio.Dsp;
 using AetherBar.Core.Models;
@@ -11,6 +12,9 @@ public class AudioManager : IDisposable
     private readonly float[] _fftBuffer;
     private int _fftPos;
     private bool _disposed;
+    private DateTime _lastDataTime;
+    private bool _hasReceivedData;
+    private readonly object _restartLock = new();
 
     private readonly Complex[] _fftComplex;
     private readonly float[] _smoothedFft;
@@ -18,6 +22,8 @@ public class AudioManager : IDisposable
     public event EventHandler<AudioData>? AudioDataAvailable;
 
     public bool IsCapturing { get; private set; }
+    public DateTime LastDataTime => _lastDataTime;
+    public bool HasReceivedData => _hasReceivedData;
 
     public AudioManager()
     {
@@ -54,67 +60,79 @@ public class AudioManager : IDisposable
 
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
-        if (_capture == null) return;
-
-        var buffer = e.Buffer;
-        int bytesPerSample = _capture.WaveFormat.BitsPerSample / 8;
-        if (bytesPerSample <= 0) bytesPerSample = 2; // fallback
-
-        int channels = _capture.WaveFormat.Channels;
-        if (channels <= 0) channels = 2; // fallback
-
-        int frameSize = channels * bytesPerSample;
-        bool isFloat = _capture.WaveFormat.Encoding == WaveFormatEncoding.IeeeFloat || _capture.WaveFormat.BitsPerSample == 32;
-
-        for (int i = 0; i + frameSize <= e.BytesRecorded && _fftPos < _fftSize; i += frameSize)
+        try
         {
-            float sum = 0;
-            for (int c = 0; c < channels; c++)
+            _lastDataTime = DateTime.UtcNow;
+            _hasReceivedData = true;
+
+            if (_capture == null) return;
+
+            var buffer = e.Buffer;
+            int bytesPerSample = _capture.WaveFormat.BitsPerSample / 8;
+            if (bytesPerSample <= 0) bytesPerSample = 2;
+
+            int channels = _capture.WaveFormat.Channels;
+            if (channels <= 0) channels = 2;
+
+            int frameSize = channels * bytesPerSample;
+            bool isFloat = _capture.WaveFormat.Encoding == WaveFormatEncoding.IeeeFloat || _capture.WaveFormat.BitsPerSample == 32;
+
+            for (int i = 0; i + frameSize <= e.BytesRecorded && _fftPos < _fftSize; i += frameSize)
             {
-                int sampleOffset = i + c * bytesPerSample;
-                float sample = 0;
+                float sum = 0;
+                for (int c = 0; c < channels; c++)
+                {
+                    int sampleOffset = i + c * bytesPerSample;
+                    float sample = 0;
 
-                if (isFloat)
-                {
-                    if (sampleOffset + 4 <= e.BytesRecorded)
+                    if (isFloat)
                     {
-                        sample = BitConverter.ToSingle(buffer, sampleOffset);
+                        if (sampleOffset + 4 <= e.BytesRecorded)
+                        {
+                            sample = BitConverter.ToSingle(buffer, sampleOffset);
+                        }
                     }
-                }
-                else if (bytesPerSample == 2)
-                {
-                    if (sampleOffset + 2 <= e.BytesRecorded)
+                    else if (bytesPerSample == 2)
                     {
-                        sample = BitConverter.ToInt16(buffer, sampleOffset) / 32768f;
+                        if (sampleOffset + 2 <= e.BytesRecorded)
+                        {
+                            sample = BitConverter.ToInt16(buffer, sampleOffset) / 32768f;
+                        }
                     }
-                }
-                else if (bytesPerSample == 3)
-                {
-                    if (sampleOffset + 3 <= e.BytesRecorded)
+                    else if (bytesPerSample == 3)
                     {
-                        int sampleVal = (buffer[sampleOffset + 2] << 16) | (buffer[sampleOffset + 1] << 8) | buffer[sampleOffset];
-                        if ((sampleVal & 0x800000) != 0) sampleVal |= unchecked((int)0xff000000); // sign extend
-                        sample = sampleVal / 8388608f;
+                        if (sampleOffset + 3 <= e.BytesRecorded)
+                        {
+                            int sampleVal = (buffer[sampleOffset + 2] << 16) | (buffer[sampleOffset + 1] << 8) | buffer[sampleOffset];
+                            if ((sampleVal & 0x800000) != 0) sampleVal |= unchecked((int)0xff000000);
+                            sample = sampleVal / 8388608f;
+                        }
                     }
-                }
-                else if (bytesPerSample == 4)
-                {
-                    if (sampleOffset + 4 <= e.BytesRecorded)
+                    else if (bytesPerSample == 4)
                     {
-                        sample = BitConverter.ToInt32(buffer, sampleOffset) / 2147483648f;
+                        if (sampleOffset + 4 <= e.BytesRecorded)
+                        {
+                            sample = BitConverter.ToInt32(buffer, sampleOffset) / 2147483648f;
+                        }
                     }
+
+                    sum += sample;
                 }
 
-                sum += sample;
+                _fftBuffer[_fftPos++] = sum / channels;
             }
 
-            _fftBuffer[_fftPos++] = sum / channels;
+            if (_fftPos >= _fftSize)
+            {
+                ProcessFft();
+                _fftPos = 0;
+            }
         }
-
-        if (_fftPos >= _fftSize)
+        catch
         {
-            ProcessFft();
-            _fftPos = 0;
+            // If an exception occurs during data processing, restart the capture
+            if (!_disposed)
+                RestartCapture();
         }
     }
 
@@ -242,6 +260,33 @@ public class AudioManager : IDisposable
     private void OnRecordingStopped(object? sender, StoppedEventArgs e)
     {
         IsCapturing = false;
+        if (!_disposed)
+        {
+            Thread.Sleep(500);
+            if (!_disposed)
+                RestartCapture();
+        }
+    }
+
+    public void RestartCapture()
+    {
+        lock (_restartLock)
+        {
+            if (_disposed) return;
+            StopCapture();
+            if (_capture != null)
+            {
+                _capture.DataAvailable -= OnDataAvailable;
+                _capture.RecordingStopped -= OnRecordingStopped;
+                _capture.Dispose();
+                _capture = null;
+            }
+            _fftPos = 0;
+            Array.Clear(_fftBuffer, 0, _fftSize);
+            Array.Clear(_smoothedFft, 0, _smoothedFft.Length);
+            _hasReceivedData = false;
+            StartCapture();
+        }
     }
 
     public void Dispose()
