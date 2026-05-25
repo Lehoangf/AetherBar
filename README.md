@@ -40,6 +40,15 @@ Real-time FFT audio visualization at 60fps directly in the taskbar using NAudio 
 - Noise gate (threshold), sensitivity multiplier, and bar start offset (skip low freqs)
 - Configurable per-mode: BarCount (8–256), Opacity (0.1–1.0), ShowPeak indicator
 
+### 🖱 Widget Click & Hover Events
+Full mouse interaction system for the main widget and plugin widgets:
+- **Single Click** on widget triggers configurable action (open URL, run program, or cycle presets)
+- **Double Click** on widget with independent action (open Settings, open URL, run program)
+- **Right Click** on widget shows tray context menu
+- **Hover** events propagate to plugins for color changes and tooltip display
+- Plugin widgets support `OnMouseClick`, `OnMouseDoubleClick`, and `OnMouseHover` callbacks
+- Plugin tooltips via `SetTooltip()` for hover descriptions
+
 ### 📻 Media Info Display
 Shows currently playing song metadata from any Windows Media Transport Controls source (Spotify, Chrome, YouTube, Media Player, etc.):
 - Title, artist text overlay
@@ -239,6 +248,9 @@ Settings are persisted as JSON at `%LOCALAPPDATA%\AetherBar\settings.json`.
 | AlbumArtSize | 24 | 16–48 |
 | AlbumArtCornerRadius | 4 | 0–24 |
 | AlbumArtOpacity | 1.0 | 0.1–1.0 |
+| DoubleClickAction | "settings" | settings / url / run / nothing |
+| DoubleClickValue | "" | URL or program path |
+| RightClickAction | "menu" | menu / nothing |
 
 ### Effects
 
@@ -274,8 +286,8 @@ Plugins may also expose their own settings through `IPluginWithSettings`.
 
 | Plugin | Custom Settings |
 |--------|-----------------|
-| Custom Text | Text Content, Font Size, Vertical Offset, Text Color |
-| System Monitor (Sample) | CPU Color, RAM Color |
+| Custom Text | Text Content, Font Size, Vertical Offset, Text Color, Single/Double Click Action & Value, Hover Action, Hover Color, Hover Tooltip |
+| System Monitor (Sample) | CPU Color, RAM Color, Single/Double Click Action & Value, Hover Action, Hover Color, Hover Tooltip |
 
 ---
 
@@ -294,6 +306,8 @@ Plugins may also expose their own settings through `IPluginWithSettings`.
 ## Changelog
 
 ### v0.2.2 (2026-05-25)
+- **Widget Click/Hover Events**: Single/double/right-click actions (open URL, run program, settings) and hover events with tooltip support
+- **Plugin Click/Hover**: `OnMouseClick`, `OnMouseDoubleClick`, `OnMouseHover` callbacks with configurable actions, color changes, and tooltips
 - **Album Art Settings**: Configurable size (16–48px), corner radius, and opacity
 - **Visualizer Height**: Adjustable height slider (10–48px), window auto-sizes to content
 - **Separate Media Controls**: Independent toggles for "Show Song Title" and "Show Album Art"
