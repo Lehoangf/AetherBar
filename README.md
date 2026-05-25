@@ -181,7 +181,7 @@ Taskbar Layout → WH_SHELL hook → TaskbarHooker.RefreshTaskbarInfo()
 ### Build & Run
 
 ```bash
-git clone https://github.com/yourusername/AetherBar.git
+git clone https://github.com/Lehoangf/AetherBar.git
 cd AetherBar
 dotnet restore AetherBar.slnx
 dotnet build AetherBar.slnx --configuration Release
@@ -282,7 +282,6 @@ Plugins may also expose their own settings through `IPluginWithSettings`.
 | 3 — Visualizer rendering (Bar/Line/Dot/Circle), tray icon | ✅ |
 | 4 — Settings dashboard, Acrylic/Mica, dark/light theme | ✅ |
 | 5 — Plugin marketplace, scripting support | 🔜 |
-| 6 — System monitor widgets (CPU, RAM, network), layouts | 🔜 |
 
 ---
 
