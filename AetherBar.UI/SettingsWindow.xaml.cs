@@ -905,6 +905,11 @@ public partial class SettingsWindow : Window
         Close();
     }
 
+    private void OnPowerClick(object sender, RoutedEventArgs e)
+    {
+        Application.Current.Shutdown();
+    }
+
     private void OnResetClick(object sender, RoutedEventArgs e)
     {
         _settingsManager.ResetToDefaults();

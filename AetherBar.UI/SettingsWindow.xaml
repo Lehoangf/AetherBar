@@ -38,6 +38,15 @@
         </StackPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                     VerticalAlignment="Center">
+            <Button x:Name="PowerBtn" Content="⏻"
+                    FontFamily="Segoe UI Symbol, Segoe UI, Arial" FontSize="16"
+                    Width="40" Height="28"
+                    VerticalAlignment="Center" VerticalContentAlignment="Center"
+                    Padding="0"
+                    Background="Transparent" Foreground="{DynamicResource FluentAccent}"
+                    BorderThickness="0"
+                    ToolTip="Exit AetherBar"
+                    Click="OnPowerClick"/>
             <Button x:Name="MinimizeBtn" Content="&#xE921;"
                     FontFamily="Segoe MDL2 Assets" FontSize="10"
                     Width="40" Height="28"
