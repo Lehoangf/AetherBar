@@ -260,6 +260,7 @@ public partial class MainWindow : Window
                     _visualizer.Options.ColorTheme = "Custom";
                     _visualizer.Options.CustomColor = ColorUtils.ClampLightness(_albumArtColor,
                         ms.AlbumArtMinLightness, ms.AlbumArtMaxLightness);
+                    _visualizer.Options.CustomGradientColors = new();
                 }
                 else
                 {
@@ -268,6 +269,11 @@ public partial class MainWindow : Window
                         (byte)(ms?.CustomColorR ?? 0),
                         (byte)(ms?.CustomColorG ?? 204),
                         (byte)(ms?.CustomColorB ?? 255));
+                    _visualizer.Options.CustomGradientColors = (ms?.CustomGradientColors ?? new())
+                        .Select(hex => ColorUtils.ParseHexColor(hex))
+                        .Where(c => c.HasValue)
+                        .Select(c => c!.Value)
+                        .ToList();
                 }
 
                 _visualizer.Options.Opacity = ms?.Opacity ?? 0.5;
@@ -279,11 +285,6 @@ public partial class MainWindow : Window
                 _visualizer.Options.AnimatedGradientEnabled = ms?.AnimatedGradientEnabled ?? false;
                 _visualizer.Options.AnimatedGradientDirection = ms?.AnimatedGradientDirection ?? "MoveRight";
                 _visualizer.Options.AnimatedGradientSpeed = ms?.AnimatedGradientSpeed ?? 1.0;
-                _visualizer.Options.CustomGradientColors = (ms?.CustomGradientColors ?? new())
-                    .Select(hex => ColorUtils.ParseHexColor(hex))
-                    .Where(c => c.HasValue)
-                    .Select(c => c!.Value)
-                    .ToList();
             }
 
             bool isDark = s.Effects.EnableDarkMode;
@@ -530,6 +531,7 @@ public partial class MainWindow : Window
             _visualizer.Options.ColorTheme = "Custom";
             _visualizer.Options.CustomColor = ColorUtils.ClampLightness(_albumArtColor,
                 ms.AlbumArtMinLightness, ms.AlbumArtMaxLightness);
+            _visualizer.Options.CustomGradientColors = new();
         }
     }
 

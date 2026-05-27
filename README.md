@@ -32,7 +32,7 @@ Real-time FFT audio visualization at 60fps directly in the taskbar using NAudio 
 
 **9 Color Themes:** Rainbow, Neon Blue, Matrix Green, Fire, Monochrome, Sunset, Ocean, Cyberpunk + Custom (up to 10 colors with individual R/G/B sliders).  
 **Animated Gradient** — smooth color cycling across all themes with 3 direction modes (MoveLeft, MoveRight, Wave), adjustable speed (0.1–5.0), and seamless interpolation. Wave mode uses sin reflection for butter-smooth transitions.  
-**Album Art Color** option — visualizer dynamically matches the dominant color extracted from the current album art (disabled when Animated Gradient is active).
+**Album Art Color** option — visualizer dynamically matches the dominant color extracted from the current album art (mutually exclusive with Animated Gradient — checking one disables the other).
 
 ### 🎚 Audio Pipeline
 - WASAPI loopback capture (all system audio) via NAudio

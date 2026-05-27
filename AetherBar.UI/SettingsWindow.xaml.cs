@@ -427,7 +427,12 @@ public partial class SettingsWindow : Window
         ColorThemeCombo.IsEnabled = !albumArtChecked;
         AlbumArtColorCheck.IsEnabled = !animatedChecked;
 
-        if (isCustom)
+        if (albumArtChecked)
+        {
+            AnimatedGradientCheck.IsEnabled = false;
+            AnimatedGradientCheck.IsChecked = false;
+        }
+        else if (isCustom)
             AnimatedGradientCheck.IsEnabled = gradientColorCount >= 2;
         else
             AnimatedGradientCheck.IsEnabled = true;
