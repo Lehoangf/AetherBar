@@ -39,9 +39,10 @@ public partial class MainWindow : Window
     private MediaInfo? _currentMedia;
     private readonly HashSet<AetherBar.Plugins.IPlugin> _runningPlugins = new();
     private Storyboard? _marqueeStoryboard;
-    private bool _isMenuOpen;
-    private nint _mouseHookHandle;
-    private NativeMethods.LowLevelMouseProc? _mouseHookProc;
+    private DispatcherTimer? _clickTimer;
+    private bool _singleClickPending;
+    private Point _lastClickPos;
+    private string _lastClickBtn = "";
 
     public class ActivePluginWidgetInfo
     {
@@ -70,20 +71,6 @@ public partial class MainWindow : Window
         SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
 
         _settingsManager = ((App)Application.Current).Settings;
-
-        _mouseHookProc = MouseHookCallback;
-        var hMod = GetModuleHandle(null);
-        _mouseHookHandle = SetWindowsHookEx(WH_MOUSE_LL, _mouseHookProc, hMod, 0);
-        try
-        {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var dir = Path.Combine(appData, "AetherBar");
-            Directory.CreateDirectory(dir);
-            File.AppendAllText(Path.Combine(dir, "plugin.log"), $"[{DateTime.Now:O}] WH_MOUSE_LL hook handle={_mouseHookHandle}\r\n");
-            if (_mouseHookHandle == 0)
-                File.AppendAllText(Path.Combine(dir, "plugin.log"), $"[{DateTime.Now:O}] WH_MOUSE_LL hook failed, last error={Marshal.GetLastWin32Error()}\r\n");
-        }
-        catch { }
 
         _hooker = new TaskbarHooker();
         _retryCount = 0;
@@ -994,12 +981,6 @@ public partial class MainWindow : Window
         _audioManager?.Dispose();
         _hooker?.Detach();
         _hooker?.Dispose();
-
-        if (_mouseHookHandle != 0)
-        {
-            UnhookWindowsHookEx(_mouseHookHandle);
-            _mouseHookHandle = 0;
-        }
     }
 
     public event Action<string, double, double>? OnWidgetMouseClick;
@@ -1008,30 +989,55 @@ public partial class MainWindow : Window
 
     private void OnWidgetPreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        var pos = e.GetPosition(this);
-        var btn = e.ChangedButton.ToString();
-
-        if (e.ChangedButton == MouseButton.Right || e.ChangedButton == MouseButton.Middle)
+        if (e.ChangedButton == MouseButton.Right)
         {
-            var rightClickAction = _settingsManager?.Current.Taskbar.RightClickAction ?? "menu";
-            if (rightClickAction == "menu")
-            {
-                ShowTrayMenu();
-                e.Handled = true;
-            }
+            ShowWidgetContextMenu();
             return;
         }
 
+        if (e.ChangedButton != MouseButton.Left)
+            return;
+
+        var pos = e.GetPosition(this);
+        var btn = e.ChangedButton.ToString();
+
         if (e.ClickCount >= 2)
         {
+            _singleClickPending = false;
+            _clickTimer?.Stop();
             OnWidgetMouseDoubleClick?.Invoke(btn, pos.X, pos.Y);
             var dcAction = _settingsManager?.Current.Taskbar.DoubleClickAction ?? "settings";
             var dcValue = _settingsManager?.Current.Taskbar.DoubleClickValue ?? "";
             HandleWidgetAction(dcAction, dcValue);
+            return;
         }
-        else
+
+        if (_singleClickPending)
         {
-            OnWidgetMouseClick?.Invoke(btn, pos.X, pos.Y);
+            _singleClickPending = false;
+            _clickTimer?.Stop();
+            return;
+        }
+
+        _lastClickPos = pos;
+        _lastClickBtn = btn;
+        _singleClickPending = true;
+        if (_clickTimer == null)
+        {
+            _clickTimer = new DispatcherTimer();
+            _clickTimer.Tick += OnClickTimerTick;
+        }
+        _clickTimer.Interval = TimeSpan.FromMilliseconds(GetDoubleClickTime());
+        _clickTimer.Start();
+    }
+
+    private void OnClickTimerTick(object? sender, EventArgs e)
+    {
+        _clickTimer?.Stop();
+        if (_singleClickPending)
+        {
+            _singleClickPending = false;
+            OnWidgetMouseClick?.Invoke(_lastClickBtn, _lastClickPos.X, _lastClickPos.Y);
         }
     }
 
@@ -1173,6 +1179,28 @@ public partial class MainWindow : Window
         menu.IsOpen = true;
     }
 
+    private void ShowWidgetContextMenu()
+    {
+        var menu = new ContextMenu
+        {
+            Placement = PlacementMode.MousePoint,
+            HorizontalOffset = 0,
+            VerticalOffset = 0,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(4),
+            FontSize = 13,
+        };
+        menu.SetResourceReference(ContextMenu.BackgroundProperty, "WindowBackground");
+        menu.SetResourceReference(ContextMenu.BorderBrushProperty, "CardBorder");
+
+        menu.Items.Add(MakeTrayItem("Settings", OnTraySettings, menu));
+        menu.Items.Add(MakeTrayItem("Restart", OnTrayRestart, menu));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MakeTrayItem("Exit", OnTrayExit, menu));
+
+        menu.IsOpen = true;
+    }
+
     private static MenuItem MakeTrayItem(string header, RoutedEventHandler handler, ContextMenu menu)
     {
         var item = new MenuItem
@@ -1186,38 +1214,6 @@ public partial class MainWindow : Window
         return item;
     }
 
-    private nint MouseHookCallback(int nCode, nint wParam, nint lParam)
-    {
-        if (nCode >= 0 && wParam == WM_RBUTTONDOWN && !_isMenuOpen)
-        {
-            try
-            {
-                var hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                if (IsCursorOverWidget(hookStruct.pt.X, hookStruct.pt.Y))
-                {
-                    return CallNextHookEx(_mouseHookHandle, nCode, wParam, lParam);
-                }
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"MouseHookCallback error: {ex.Message}");
-            }
-        }
-        return CallNextHookEx(_mouseHookHandle, nCode, wParam, lParam);
-    }
-
-    private bool IsCursorOverWidget(int screenX, int screenY)
-    {
-        if (!_embedded) return false;
-        var hwnd = new WindowInteropHelper(this).Handle;
-        NativeMethods.GetWindowRect(hwnd, out var rect);
-        return screenX >= rect.Left && screenX <= rect.Right &&
-               screenY >= rect.Top && screenY <= rect.Bottom;
-    }
-
-    private const int WH_MOUSE_LL = 14;
-    private const int WM_RBUTTONDOWN = 0x0204;
-
     private static void LogDebug(string message)
     {
         try
@@ -1229,74 +1225,8 @@ public partial class MainWindow : Window
         catch { }
     }
 
-    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern nint SetWindowsHookEx(int idHook, NativeMethods.LowLevelMouseProc lpfn, nint hMod, uint dwThreadId);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool UnhookWindowsHookEx(nint hhk);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern nint CallNextHookEx(nint hhk, int nCode, nint wParam, nint lParam);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern nint GetModuleHandle(string? lpModuleName);
-
     [DllImport("user32.dll")]
-    private static extern nint GetForegroundWindow();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
-
-    [DllImport("kernel32.dll")]
-    private static extern uint GetCurrentThreadId();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool fAttach);
-
-    private static void ForceForeground(nint hwnd)
-    {
-        try
-        {
-            var foregroundHwnd = GetForegroundWindow();
-            if (foregroundHwnd == hwnd) return;
-
-            uint processId;
-            var foregroundThreadId = GetWindowThreadProcessId(foregroundHwnd, out processId);
-            var currentThreadId = GetCurrentThreadId();
-
-            bool success;
-            if (foregroundThreadId != currentThreadId && foregroundThreadId != 0)
-            {
-                AttachThreadInput(currentThreadId, foregroundThreadId, true);
-                success = NativeMethods.SetForegroundWindow(hwnd);
-                AttachThreadInput(currentThreadId, foregroundThreadId, false);
-            }
-            else
-            {
-                success = NativeMethods.SetForegroundWindow(hwnd);
-            }
-            LogDebug($"ForceForeground (SetForegroundWindow): {success}");
-        }
-        catch (Exception ex)
-        {
-            LogDebug($"ForceForeground error: {ex.Message}");
-        }
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct POINT { public int X; public int Y; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MSLLHOOKSTRUCT
-    {
-        public POINT pt;
-        public uint mouseData;
-        public uint flags;
-        public uint time;
-        public nint dwExtraInfo;
-    }
+    private static extern uint GetDoubleClickTime();
 
     [DllImport("user32.dll")]
     private static extern int GetWindowLong(IntPtr hWnd, int nIndex);

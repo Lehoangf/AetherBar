@@ -303,31 +303,6 @@ Plugins may also expose their own settings through `IPluginWithSettings`.
 
 ---
 
-## Changelog
-
-### v0.2.3 (2026-05-27)
-- **Power Button**: Shutdown button (⏻) in Settings title bar with red accent color, centered vertically
-- **Settings UX Polish**: Title bar buttons aligned and styled consistently
-- **Widget Right-Click**: Removed custom popup menu, right-click passes through to system
-
-### v0.2.2 (2026-05-25)
-- **Widget Click/Hover Events**: Single/double/right-click actions (open URL, run program, settings) and hover events with tooltip support
-- **Plugin Click/Hover**: `OnMouseClick`, `OnMouseDoubleClick`, `OnMouseHover` callbacks with configurable actions, color changes, and tooltips
-- **Album Art Settings**: Configurable size (16–48px), corner radius, and opacity
-- **Visualizer Height**: Adjustable height slider (10–48px), window auto-sizes to content
-- **Separate Media Controls**: Independent toggles for "Show Song Title" and "Show Album Art"
-- **Marquee Scrolling**: Long song titles now scroll left-right with pause at each end
-- **Plugin improvements**: Better lifecycle, non-nullable refactoring, async initialization
-- **Bug fixes**: Mode switching, audio freeze workaround, adaptive theme timing, double-click debounce
-
-### v0.2.1
-- Restart tray option, audio freeze fix
-
-### v0.2.0
-- Initial public release
-
----
-
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.

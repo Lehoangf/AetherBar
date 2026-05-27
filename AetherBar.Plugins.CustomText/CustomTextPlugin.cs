@@ -18,8 +18,6 @@ public class CustomTextPlugin : IPluginWithSettings
     private double _fontSize = 11;
     private double _verticalOffset = 0;
     private string _textColor = "#FFFFFF";
-    private static readonly string[] Presets = { "Hello World", "Click me!", "Try hovering!", "Double-click!" };
-    private int _presetIndex;
 
     private string _singleClickAction = "nothing";
     private string _singleClickValue = "";
@@ -49,31 +47,15 @@ public class CustomTextPlugin : IPluginWithSettings
     private void OnSingleClick(string button, double x, double y)
     {
         _context?.Log($"CustomText single-click: {button}");
-        if (_singleClickAction == "nothing")
-        {
-            _presetIndex = (_presetIndex + 1) % Presets.Length;
-            _text = Presets[_presetIndex];
-            ApplyWidgetState();
-        }
-        else
-        {
+        if (_singleClickAction != "nothing")
             ExecuteAction(_singleClickAction, _singleClickValue);
-        }
     }
 
     private void OnDoubleClick(string button, double x, double y)
     {
         _context?.Log($"CustomText double-click: {button}");
-        if (_doubleClickAction == "nothing")
-        {
-            _presetIndex = 0;
-            _text = "Reset!";
-            ApplyWidgetState();
-        }
-        else
-        {
+        if (_doubleClickAction != "nothing")
             ExecuteAction(_doubleClickAction, _doubleClickValue);
-        }
     }
 
     private void OnHover(bool hovering)

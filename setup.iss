@@ -8,7 +8,7 @@
 ;   2. iscc setup.iss
 
 #define MyAppName "AetherBar"
-#define MyAppVersion "0.2.3"
+#define MyAppVersion "0.2.4"
 #define MyAppPublisher "AetherBar"
 #define MyAppURL "https://github.com/Lehoangf/AetherBar"
 #define MyAppExeName "AetherBar.UI.exe"
@@ -59,14 +59,12 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch AetherBar"; Flags: postinstall nowait skipifsilent shellexec
-Filename: "{reg:HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\dotnet.exe,}"; Parameters: "run --project ""{src}\AetherBar.UI"" -c Release"; Description: "Build & Run from Source (requires .NET SDK)"; Flags: postinstall nowait skipifsilent unchecked shellexec
 
 [Registry]
 ; Add startup entry if task selected
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "AetherBar"; ValueData: "{app}\{#MyAppExeName}"; Tasks: startup; Flags: uninsdeletevalue
 
-[UninstallRun]
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall"; RunOnceId: "AetherBarUninstall"
+; App must be closed manually before uninstalling to allow clean file removal
 
 [Code]
 function InitializeSetup: Boolean;
