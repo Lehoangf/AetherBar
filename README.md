@@ -10,7 +10,7 @@
 
 ## Demo
 
-![AetherBar Demo](AetherBar.UI/Assets/demo.gif)
+![AetherBar Demo](https://raw.githubusercontent.com/Lehoangf/AetherBar/master/AetherBar.UI/Assets/demo.gif)
 
 *Audio visualizer running in the Windows taskbar with 6 rendering modes.*
 
