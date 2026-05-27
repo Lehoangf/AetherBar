@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Media;
 
@@ -10,6 +11,11 @@ public class CircleVisualizer : IVisualizerRenderer
     public void Render(DrawingContext context, float[] fftData, float peakLevel, Size size, RenderOptions options)
     {
         if (fftData.Length == 0) return;
+
+        var animated = options.AnimatedGradientEnabled;
+        var animTime = options.AnimationTime;
+        var animDir = options.AnimatedGradientDirection;
+        var animSpeed = options.AnimatedGradientSpeed;
 
         double cx = size.Width / 2;
         double cy = size.Height;
@@ -39,7 +45,15 @@ public class CircleVisualizer : IVisualizerRenderer
             double x2 = cx + Math.Cos(Math.PI - angle) * barLen;
             double y2 = cy - Math.Sin(angle) * barLen;
 
-            var color = BarVisualizer.GetThemeColor(options.ColorTheme, (float)i / segments, value, options.CustomColor);
+            float t = (float)i / segments;
+            float intensity = value;
+
+            if (animated)
+            {
+                t = BarVisualizer.GetAnimatedT(t, animTime, animDir, animSpeed);
+            }
+
+            var color = BarVisualizer.GetThemeColor(options.ColorTheme, t, intensity, options.CustomColor, options.CustomGradientColors);
 
             // Thick wedge line
             var pen = new Pen(new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B)), 2.5);
@@ -54,18 +68,20 @@ public class CircleVisualizer : IVisualizerRenderer
             context.DrawLine(glowPen, new Point(x1, y1), new Point(x2, y2));
         }
 
+        float pulseT = animated ? BarVisualizer.GetAnimatedT(0.5f, animTime, animDir, animSpeed) : 0.5f;
+
         // Center glow
         if (peakLevel > 0.01f)
         {
             double pulseR = 2 + peakLevel * 4;
-            var pulseColor = BarVisualizer.GetThemeColor(options.ColorTheme, 0.5f, peakLevel, options.CustomColor);
+            var pulseColor = BarVisualizer.GetThemeColor(options.ColorTheme, pulseT, peakLevel, options.CustomColor, options.CustomGradientColors);
             context.DrawEllipse(
                 new SolidColorBrush(Color.FromArgb((byte)(alpha * 0.5), pulseColor.R, pulseColor.G, pulseColor.B)),
                 null, new Point(cx, cy), pulseR, pulseR);
         }
 
         // Subtle arc connecting the tips
-        var arcColor = BarVisualizer.GetThemeColor(options.ColorTheme, 0.5f, 0.3f, options.CustomColor);
+        var arcColor = BarVisualizer.GetThemeColor(options.ColorTheme, pulseT, 0.3f, options.CustomColor, options.CustomGradientColors);
         var arcPen = new Pen(new SolidColorBrush(Color.FromArgb((byte)(alpha * 0.2), arcColor.R, arcColor.G, arcColor.B)), 1);
         var arcGeo = new StreamGeometry();
         using (var arcCtx = arcGeo.Open())

@@ -13,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AetherBar.Core.Audio;
 using AetherBar.Core.Media;
+using AetherBar.Plugins;
 using AetherBar.Core.Models;
 using AetherBar.Core.Settings;
 using AetherBar.Core.Visualizer;
@@ -43,6 +44,8 @@ public partial class MainWindow : Window
     private bool _singleClickPending;
     private Point _lastClickPos;
     private string _lastClickBtn = "";
+    private Color _albumArtColor = Colors.Transparent;
+    internal static Color CurrentAlbumArtColor { get; private set; }
 
     public class ActivePluginWidgetInfo
     {
@@ -156,8 +159,6 @@ public partial class MainWindow : Window
                 _mediaActive = true;
                 _currentMedia = media;
                 VisualizerControl.Visibility = Visibility.Visible;
-                MediaButtonsPanel.Visibility = Visibility.Visible;
-                BtnPlayPause.Text = media.PlaybackStatus == MediaPlaybackStatus.Playing ? "⏸" : "▶";
 
                 if (media.AlbumArt != null && media.AlbumArt.Length > 0)
                 {
@@ -171,13 +172,18 @@ public partial class MainWindow : Window
                     AlbumArtImage.Source = bmp;
                     ApplyAlbumArtSettings();
 
+                    var color = DominantColorExtractor.ExtractFromBytes(media.AlbumArt);
+                    _albumArtColor = color;
+                    CurrentAlbumArtColor = color;
+
                     if (s.Effects.AdaptiveTheme &&
                         s.Effects.BackgroundEffect != "None")
                     {
-                        var color = DominantColorExtractor.ExtractFromBytes(media.AlbumArt);
                         WidgetContainer.Background = new SolidColorBrush(
                             Color.FromArgb(40, color.R, color.G, color.B));
                     }
+
+                    ApplyAlbumArtColorToVisualizer();
                 }
                 else
                 {
@@ -207,7 +213,6 @@ public partial class MainWindow : Window
                 _mediaActive = false;
                 _hasAlbumArt = false;
                 _currentMedia = null;
-                MediaButtonsPanel.Visibility = Visibility.Collapsed;
                 ApplyAlbumArtSettings();
                 SongInfoText.Visibility = Visibility.Collapsed;
                 StopMarquee();
@@ -241,28 +246,44 @@ public partial class MainWindow : Window
             ApplyAlbumArtSettings();
 
             VisualizerControl.Height = s.Taskbar.VisualizerHeight;
-            double contentH = s.Taskbar.VisualizerHeight;
-            if (s.Taskbar.ShowSongTitle && _mediaActive)
-                contentH += 14;
-            Height = WidgetContainer.Margin.Top + WidgetContainer.Margin.Bottom
-                     + s.Taskbar.WidgetPaddingY * 2
-                     + contentH;
+            VisualizerOffsetTransform.Y = s.Taskbar.VisualizerOffsetY;
+            TitleClip.Opacity = s.Taskbar.TitleOpacity;
+            Dispatcher.BeginInvoke(UpdateWindowHeight, DispatcherPriority.Background);
 
             if (_visualizer != null)
             {
                 var mode = s.Visualizer.Mode;
                 s.Visualizer.ModeSettings.TryGetValue(mode, out var ms);
-                _visualizer.Options.ColorTheme = ms?.ColorTheme ?? "Rainbow";
+
+                if (ms?.AlbumArtColor == true && _albumArtColor != Colors.Transparent)
+                {
+                    _visualizer.Options.ColorTheme = "Custom";
+                    _visualizer.Options.CustomColor = ColorUtils.ClampLightness(_albumArtColor,
+                        ms.AlbumArtMinLightness, ms.AlbumArtMaxLightness);
+                }
+                else
+                {
+                    _visualizer.Options.ColorTheme = ms?.ColorTheme ?? "Rainbow";
+                    _visualizer.Options.CustomColor = Color.FromRgb(
+                        (byte)(ms?.CustomColorR ?? 0),
+                        (byte)(ms?.CustomColorG ?? 204),
+                        (byte)(ms?.CustomColorB ?? 255));
+                }
+
                 _visualizer.Options.Opacity = ms?.Opacity ?? 0.5;
                 _visualizer.Options.BarCount = ms?.BarCount ?? 32;
                 _visualizer.Options.Sensitivity = ms?.Sensitivity ?? 1.0;
                 _visualizer.Options.Threshold = ms?.Threshold ?? 0.0;
                 _visualizer.Options.BarStartOffset = ms?.BarStartOffset ?? 0;
-                _visualizer.Options.CustomColor = Color.FromRgb(
-                    (byte)(ms?.CustomColorR ?? 0),
-                    (byte)(ms?.CustomColorG ?? 204),
-                    (byte)(ms?.CustomColorB ?? 255));
                 _visualizer.Options.ShowPeak = ms?.ShowPeak ?? true;
+                _visualizer.Options.AnimatedGradientEnabled = ms?.AnimatedGradientEnabled ?? false;
+                _visualizer.Options.AnimatedGradientDirection = ms?.AnimatedGradientDirection ?? "MoveRight";
+                _visualizer.Options.AnimatedGradientSpeed = ms?.AnimatedGradientSpeed ?? 1.0;
+                _visualizer.Options.CustomGradientColors = (ms?.CustomGradientColors ?? new())
+                    .Select(hex => ColorUtils.ParseHexColor(hex))
+                    .Where(c => c.HasValue)
+                    .Select(c => c!.Value)
+                    .ToList();
             }
 
             bool isDark = s.Effects.EnableDarkMode;
@@ -392,6 +413,8 @@ public partial class MainWindow : Window
                 var alignment = ps?.Alignment ?? "Right";
                 var padding = ps?.Padding ?? 6;
                 var width = ps?.Width ?? -1;
+                var opacity = ps?.Opacity ?? 1.0;
+                var verticalOffset = ps?.VerticalOffset ?? 0;
 
                 // Determine target panel
                 Panel targetPanel = PluginPanelRight;
@@ -406,7 +429,10 @@ public partial class MainWindow : Window
                 // Reset internal padding to safe original value to prevent text cropping
                 info.Host.Padding = new Thickness(6, 2, 6, 2);
 
-                // Apply horizontal shift using TranslateTransform
+                // Apply opacity
+                info.Host.Opacity = opacity;
+
+                // Apply horizontal shift and vertical offset using TranslateTransform
                 var translate = info.Host.RenderTransform as TranslateTransform;
                 if (translate == null)
                 {
@@ -414,6 +440,7 @@ public partial class MainWindow : Window
                     info.Host.RenderTransform = translate;
                 }
                 translate.X = padding; // Use padding setting as translation X offset
+                translate.Y = verticalOffset;
 
                 // Apply width and min-width
                 if (width > 0)
@@ -451,6 +478,17 @@ public partial class MainWindow : Window
         }
     }
 
+    private void UpdateWindowHeight()
+    {
+        try
+        {
+            if (!_embedded) return;
+            var margin = WidgetContainer.Margin;
+            Height = WidgetContainer.ActualHeight + margin.Top + margin.Bottom;
+        }
+        catch { }
+    }
+
     private void ApplyBackgroundForCurrentState(MediaInfo? media = null)
     {
         var s = _settingsManager.Current;
@@ -479,6 +517,20 @@ public partial class MainWindow : Window
         WidgetContainer.Background = s.Effects.EnableDarkMode
             ? new SolidColorBrush(Color.FromArgb(34, 0, 0, 0))
             : new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+    }
+
+    private void ApplyAlbumArtColorToVisualizer()
+    {
+        if (_visualizer == null) return;
+        var s = _settingsManager.Current;
+        var mode = s.Visualizer.Mode;
+        s.Visualizer.ModeSettings.TryGetValue(mode, out var ms);
+        if (ms?.AlbumArtColor == true && _albumArtColor != Colors.Transparent)
+        {
+            _visualizer.Options.ColorTheme = "Custom";
+            _visualizer.Options.CustomColor = ColorUtils.ClampLightness(_albumArtColor,
+                ms.AlbumArtMinLightness, ms.AlbumArtMaxLightness);
+        }
     }
 
     private void ApplyAlbumArtSettings()
@@ -674,6 +726,7 @@ public partial class MainWindow : Window
         }
 
         public nint TaskbarHwnd => _hooker.CurrentTaskbarInfo.TaskbarHwnd;
+        public IMediaController? MediaController => _mainWindow._mediaManager;
 
         public AetherBar.Plugins.PluginWidget CreateWidget(string name, int width, int height)
         {
@@ -692,6 +745,7 @@ public partial class MainWindow : Window
                 TextBlock topText = null!;
                 TextBlock bottomText = null!;
                 StackPanel stack = null!;
+                StackPanel iconsContainer = null!;
                 Border host = null!;
                 double currentFontSize = 11;
 
@@ -758,6 +812,15 @@ public partial class MainWindow : Window
                     stack.Children.Add(topText);
                     stack.Children.Add(bottomText);
 
+                    iconsContainer = new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Visibility = Visibility.Collapsed
+                    };
+                    stack.Children.Add(iconsContainer);
+
                     host = new Border
                     {
                         Width = double.NaN,
@@ -796,137 +859,220 @@ public partial class MainWindow : Window
                 // log creation for diagnostics
                 try { Log($"Plugin host created: {name} (w:{width} h:{height})"); } catch { }
 
-                var widget = new AetherBar.Plugins.PluginWidget(name, width, height, s =>
-                {
-                    try
-                    {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            // Support two-line content: "CPU: x%\nRAM: y%" or inline form
-                            if (s.Contains("\n"))
-                            {
-                                var parts = s.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                                topText.Text = parts.Length > 0 ? parts[0].Trim() : string.Empty;
-                                bottomText.Text = parts.Length > 1 ? parts[1].Trim() : string.Empty;
-                            }
-                            else if (s.Contains("CPU:") && s.Contains("RAM:"))
-                            {
-                                // try split by RAM label
-                                var ramIndex = s.IndexOf("RAM:", StringComparison.OrdinalIgnoreCase);
-                                if (ramIndex > 0)
-                                {
-                                    topText.Text = s.Substring(0, ramIndex).Trim();
-                                    bottomText.Text = s.Substring(ramIndex).Trim();
-                                }
-                                else
-                                {
-                                    topText.Text = s;
-                                    bottomText.Text = string.Empty;
-                                }
-                            }
-                            else
-                            {
-                                topText.Text = s;
-                                bottomText.Text = string.Empty;
-                            }
+        string iconColor = "#FFFFFF";
+        double iconSize = 14;
+        double iconSpacing = 0;
+        List<string>? lastIconNames = null;
 
-                            bottomText.Visibility = string.IsNullOrEmpty(bottomText.Text) 
-                                ? Visibility.Collapsed 
-                                : Visibility.Visible;
-                            UpdateTextLayoutMetrics();
-                        });
-                        try { Log($"Plugin widget update: {name} => {s}"); } catch { }
-                    }
-                    catch (Exception ex)
-                    {
-                        try { Log($"Plugin widget update failed: {name} => {ex.Message}"); } catch { }
-                    }
-                }, size =>
+        void RenderIcons()
+        {
+            iconsContainer.Children.Clear();
+            if (lastIconNames != null && lastIconNames.Count > 0)
+            {
+                var brush = CreateColorBrush(iconColor) ?? new SolidColorBrush(Colors.White);
+                foreach (var name in lastIconNames)
                 {
-                    try
+                    UIElement? element = name switch
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            currentFontSize = size;
-                            topText.FontSize = size;
-                            UpdateTextLayoutMetrics();
-                        });
-                        try { Log($"Plugin widget font size update: {name} => {size}"); } catch { }
+                        "play" => MediaIcons.CreatePlay(iconSize, brush),
+                        "pause" => MediaIcons.CreatePause(iconSize, brush),
+                        "prev" => MediaIcons.CreatePrevious(iconSize, brush),
+                        "next" => MediaIcons.CreateNext(iconSize, brush),
+                        _ => null
+                    };
+                    if (element != null)
+                    {
+                        if (iconSpacing > 0 && iconsContainer.Children.Count > 0)
+                            if (element is FrameworkElement fe)
+                                fe.Margin = new Thickness(iconSpacing, 0, 0, 0);
+                        iconsContainer.Children.Add(element);
                     }
-                    catch (Exception ex)
-                    {
-                        try { Log($"Plugin widget font size update failed: {name} => {ex.Message}"); } catch { }
-                    }
-                }, offset =>
-                {
-                    try
-                    {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            var translate = host.RenderTransform as TranslateTransform;
-                            if (translate == null)
-                            {
-                                translate = new TranslateTransform();
-                                host.RenderTransform = translate;
-                            }
-                            translate.Y = offset;
-                        });
-                        try { Log($"Plugin widget vertical offset update: {name} => {offset}"); } catch { }
-                    }
-                    catch (Exception ex)
-                    {
-                        try { Log($"Plugin widget vertical offset update failed: {name} => {ex.Message}"); } catch { }
-                    }
-                }, color =>
-                {
-                    try
-                    {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            var brush = CreateColorBrush(color);
-                            if (brush == null)
-                                return;
+                }
+                iconsContainer.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                iconsContainer.Visibility = Visibility.Collapsed;
+            }
+            topText.Visibility = Visibility.Collapsed;
+            bottomText.Visibility = Visibility.Collapsed;
+        }
 
-                            topText.Foreground = brush;
-                            bottomText.Foreground = brush;
-                        });
-                        try { Log($"Plugin widget text color update: {name} => {color}"); } catch { }
-                    }
-                    catch (Exception ex)
-                    {
-                        try { Log($"Plugin widget text color update failed: {name} => {ex.Message}"); } catch { }
-                    }
-                }, (topColor, bottomColor) =>
+        var widget = new AetherBar.Plugins.PluginWidget(name, width, height, s =>
+        {
+            try
+            {
+                Application.Current.Dispatcher.Invoke(() =>
                 {
-                    try
+                    // Support two-line content: "CPU: x%\nRAM: y%" or inline form
+                    if (s.Contains("\n"))
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
+                        var parts = s.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        topText.Text = parts.Length > 0 ? parts[0].Trim() : string.Empty;
+                        bottomText.Text = parts.Length > 1 ? parts[1].Trim() : string.Empty;
+                    }
+                    else if (s.Contains("CPU:") && s.Contains("RAM:"))
+                    {
+                        // try split by RAM label
+                        var ramIndex = s.IndexOf("RAM:", StringComparison.OrdinalIgnoreCase);
+                        if (ramIndex > 0)
                         {
-                            var topBrush = CreateColorBrush(topColor);
-                            var bottomBrush = CreateColorBrush(bottomColor);
+                            topText.Text = s.Substring(0, ramIndex).Trim();
+                            bottomText.Text = s.Substring(ramIndex).Trim();
+                        }
+                        else
+                        {
+                            topText.Text = s;
+                            bottomText.Text = string.Empty;
+                        }
+                    }
+                    else
+                    {
+                        topText.Text = s;
+                        bottomText.Text = string.Empty;
+                    }
 
-                            if (topBrush != null)
-                                topText.Foreground = topBrush;
-                            if (bottomBrush != null)
-                                bottomText.Foreground = bottomBrush;
-                        });
-                        try { Log($"Plugin widget line color update: {name} => {topColor}, {bottomColor}"); } catch { }
-                    }
-                    catch (Exception ex)
-                    {
-                        try { Log($"Plugin widget line color update failed: {name} => {ex.Message}"); } catch { }
-                    }
-                }, tooltip =>
-                {
-                    try
-                    {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            host.ToolTip = tooltip;
-                        });
-                    }
-                    catch { }
+                    bottomText.Visibility = string.IsNullOrEmpty(bottomText.Text) 
+                        ? Visibility.Collapsed 
+                        : Visibility.Visible;
+                    UpdateTextLayoutMetrics();
                 });
+                try { Log($"Plugin widget update: {name} => {s}"); } catch { }
+            }
+            catch (Exception ex)
+            {
+                try { Log($"Plugin widget update failed: {name} => {ex.Message}"); } catch { }
+            }
+        }, size =>
+        {
+            try
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    currentFontSize = size;
+                    topText.FontSize = size;
+                    UpdateTextLayoutMetrics();
+                });
+                try { Log($"Plugin widget font size update: {name} => {size}"); } catch { }
+            }
+            catch (Exception ex)
+            {
+                try { Log($"Plugin widget font size update failed: {name} => {ex.Message}"); } catch { }
+            }
+        }, offset =>
+        {
+            try
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    var translate = host.RenderTransform as TranslateTransform;
+                    if (translate == null)
+                    {
+                        translate = new TranslateTransform();
+                        host.RenderTransform = translate;
+                    }
+                    translate.Y = offset;
+                });
+                try { Log($"Plugin widget vertical offset update: {name} => {offset}"); } catch { }
+            }
+            catch (Exception ex)
+            {
+                try { Log($"Plugin widget vertical offset update failed: {name} => {ex.Message}"); } catch { }
+            }
+        }, color =>
+        {
+            try
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    var brush = CreateColorBrush(color);
+                    if (brush == null)
+                        return;
+
+                    topText.Foreground = brush;
+                    bottomText.Foreground = brush;
+                });
+                try { Log($"Plugin widget text color update: {name} => {color}"); } catch { }
+            }
+            catch (Exception ex)
+            {
+                try { Log($"Plugin widget text color update failed: {name} => {ex.Message}"); } catch { }
+            }
+        }, (topColor, bottomColor) =>
+        {
+            try
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    var topBrush = CreateColorBrush(topColor);
+                    var bottomBrush = CreateColorBrush(bottomColor);
+
+                    if (topBrush != null)
+                        topText.Foreground = topBrush;
+                    if (bottomBrush != null)
+                        bottomText.Foreground = bottomBrush;
+                });
+                try { Log($"Plugin widget line color update: {name} => {topColor}, {bottomColor}"); } catch { }
+            }
+            catch (Exception ex)
+            {
+                try { Log($"Plugin widget line color update failed: {name} => {ex.Message}"); } catch { }
+            }
+        }, tooltip =>
+        {
+            try
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    host.ToolTip = tooltip;
+                });
+            }
+            catch { }
+        }, opacity =>
+        {
+            try
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    host.Opacity = opacity;
+                });
+            }
+            catch { }
+        }, icons =>
+        {
+            try
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    lastIconNames = icons != null ? new List<string>(icons) : null;
+                    RenderIcons();
+                });
+            }
+            catch { }
+        }, iconColorCb =>
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                iconColor = iconColorCb ?? "#FFFFFF";
+                RenderIcons();
+            });
+        }, iconSizeCb =>
+        {
+            if (iconSizeCb > 0)
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    iconSize = iconSizeCb;
+                    RenderIcons();
+                });
+        }, iconSpacingCb =>
+        {
+            if (iconSpacingCb >= 0)
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    iconSpacing = iconSpacingCb;
+                    RenderIcons();
+                });
+        });
 
                 // no native handle when hosted in WPF panel; set handle to 0
                 widget.SetHandle(0);
@@ -1047,24 +1193,6 @@ public partial class MainWindow : Window
 
     private void OnWidgetPreviewMouseUp(object sender, MouseButtonEventArgs e)
     {
-    }
-
-    private async void OnMediaPrevClick(object sender, MouseButtonEventArgs e)
-    {
-        if (_mediaManager != null)
-            await _mediaManager.SkipPreviousAsync();
-    }
-
-    private async void OnMediaPlayPauseClick(object sender, MouseButtonEventArgs e)
-    {
-        if (_mediaManager != null)
-            await _mediaManager.PlayPauseAsync();
-    }
-
-    private async void OnMediaNextClick(object sender, MouseButtonEventArgs e)
-    {
-        if (_mediaManager != null)
-            await _mediaManager.SkipNextAsync();
     }
 
     private static void HandleWidgetAction(string action, string value)

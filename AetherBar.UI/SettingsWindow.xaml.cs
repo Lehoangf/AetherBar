@@ -19,6 +19,22 @@ public partial class SettingsWindow : Window
     private bool _loading;
     private Point _dragStartPoint;
     private bool _isDragging;
+    private DispatcherTimer? _previewTimer;
+    private const int MaxCustomColors = 10;
+    private readonly List<CustomColorRow> _customColorRows = new();
+    private ComboBox[] _allCombos = null!;
+
+    private class CustomColorRow
+    {
+        public Border Container { get; set; } = null!;
+        public Border Swatch { get; set; } = null!;
+        public Slider R { get; set; } = null!;
+        public Slider G { get; set; } = null!;
+        public Slider B { get; set; } = null!;
+        public TextBlock RText { get; set; } = null!;
+        public TextBlock GText { get; set; } = null!;
+        public TextBlock BText { get; set; } = null!;
+    }
 
     public SettingsWindow(SettingsManager settingsManager)
     {
@@ -35,7 +51,38 @@ public partial class SettingsWindow : Window
         };
 
         InitializeComponent();
+        _allCombos = new[] { VisualizerModeCombo, ColorThemeCombo, AnimatedDirectionCombo,
+            PositionCombo, WidgetTextColorCombo, DoubleClickActionCombo, RightClickActionCombo,
+            BgEffectCombo, PluginSelectorCombo, PluginAlignmentCombo };
+        Closing += (_, _) => _previewTimer?.Stop();
+        PreviewMouseWheel += (_, _) =>
+        {
+            var mouseOver = Mouse.DirectlyOver as DependencyObject;
+            bool overComboItem = false;
+            while (mouseOver != null)
+            {
+                if (mouseOver is ComboBoxItem) { overComboItem = true; break; }
+                mouseOver = VisualTreeHelper.GetParent(mouseOver);
+            }
+            if (!overComboItem)
+            {
+                foreach (var combo in _allCombos)
+                {
+                    if (combo.IsDropDownOpen)
+                    {
+                        combo.IsDropDownOpen = false;
+                        break;
+                    }
+                }
+            }
+        };
         LoadSettings();
+
+        _previewTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _previewTimer.Tick += (_, _) => UpdateColorPreview();
+        _previewTimer.Start();
+
+        _loading = false;
     }
 
     protected override void OnActivated(EventArgs e)
@@ -75,21 +122,14 @@ public partial class SettingsWindow : Window
         PopulateCombo(DoubleClickActionCombo, "nothing", "settings", "url", "run");
         PopulateCombo(RightClickActionCombo, "menu", "nothing");
 
-        BlockComboScroll(VisualizerModeCombo);
-        BlockComboScroll(ColorThemeCombo);
-        BlockComboScroll(PositionCombo);
-        BlockComboScroll(BgEffectCombo);
-        BlockComboScroll(WidgetTextColorCombo);
-        BlockComboScroll(DoubleClickActionCombo);
-        BlockComboScroll(RightClickActionCombo);
+        foreach (var combo in _allCombos)
+            combo.MaxDropDownHeight = 160;
 
         SelectItem(VisualizerModeCombo, s.Visualizer.Mode);
         var mode = GetSelected(VisualizerModeCombo);
         s.Visualizer.ModeSettings.TryGetValue(mode, out var ms);
         SelectItem(ColorThemeCombo, ms?.ColorTheme ?? "Rainbow");
-        CustomRSlider.Value = ms?.CustomColorR ?? 0;
-        CustomGSlider.Value = ms?.CustomColorG ?? 204;
-        CustomBSlider.Value = ms?.CustomColorB ?? 255;
+        LoadCustomGradientFromSettings(ms?.CustomGradientColors, (byte)(ms?.CustomColorR ?? 0), (byte)(ms?.CustomColorG ?? 204), (byte)(ms?.CustomColorB ?? 255));
         UpdateColorPreview();
         OpacitySlider.Value = ms?.Opacity ?? 0.5;
         BarCountSlider.Value = ms?.BarCount ?? 32;
@@ -97,6 +137,16 @@ public partial class SettingsWindow : Window
         ThresholdSlider.Value = ms?.Threshold ?? 0.0;
         BarStartOffsetSlider.Value = ms?.BarStartOffset ?? 0;
         ShowPeakCheck.IsChecked = ms?.ShowPeak ?? true;
+        AlbumArtColorCheck.IsChecked = ms?.AlbumArtColor ?? false;
+        AlbumArtBrightnessPanel.Visibility = AlbumArtColorCheck.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        AlbumArtMinLightnessSlider.Value = ms?.AlbumArtMinLightness ?? 0.3;
+        AlbumArtMaxLightnessSlider.Value = ms?.AlbumArtMaxLightness ?? 0.85;
+        PopulateCombo(AnimatedDirectionCombo, "MoveRight", "MoveLeft", "Wave");
+        AnimatedGradientCheck.IsChecked = ms?.AnimatedGradientEnabled ?? false;
+        AnimatedGradientPanel.Visibility = AnimatedGradientCheck.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        SelectItem(AnimatedDirectionCombo, ms?.AnimatedGradientDirection ?? "MoveRight");
+        AnimatedSpeedSlider.Value = ms?.AnimatedGradientSpeed ?? 1.0;
+        UpdateCheckStates();
 
         SelectItem(PositionCombo, s.Taskbar.Position);
         WidthSlider.Value = s.Taskbar.WidgetWidth;
@@ -104,6 +154,7 @@ public partial class SettingsWindow : Window
         PaddingXSlider.Value = s.Taskbar.WidgetPaddingX;
         PaddingYSlider.Value = s.Taskbar.WidgetPaddingY;
         VisualizerHeightSlider.Value = s.Taskbar.VisualizerHeight;
+        VisualizerOffsetYSlider.Value = s.Taskbar.VisualizerOffsetY;
         ShowSongTitleCheck.IsChecked = s.Taskbar.ShowSongTitle;
         ShowAlbumArtCheck.IsChecked = s.Taskbar.ShowAlbumArt;
         AutoHideCheck.IsChecked = s.Taskbar.AutoHide;
@@ -117,6 +168,8 @@ public partial class SettingsWindow : Window
         AlbumArtSizeSlider.Value = s.Taskbar.AlbumArtSize;
         AlbumArtRadiusSlider.Value = s.Taskbar.AlbumArtCornerRadius;
         AlbumArtOpacitySlider.Value = s.Taskbar.AlbumArtOpacity;
+
+        TitleOpacitySlider.Value = s.Taskbar.TitleOpacity;
 
         SelectItem(DoubleClickActionCombo, s.Taskbar.DoubleClickAction);
         DoubleClickValueBox.Text = s.Taskbar.DoubleClickValue ?? "";
@@ -134,8 +187,6 @@ public partial class SettingsWindow : Window
         UpdateCheck.IsChecked = s.General.CheckForUpdates;
 
         PopulateCombo(PluginAlignmentCombo, "Left", "Center", "Right");
-        BlockComboScroll(PluginSelectorCombo);
-        BlockComboScroll(PluginAlignmentCombo);
         PopulatePluginsList();
         PopulatePluginsSortList();
 
@@ -206,6 +257,25 @@ public partial class SettingsWindow : Window
     {
         if (_loading) return;
 
+        if (sender == AlbumArtColorCheck)
+        {
+            AlbumArtBrightnessPanel.Visibility =
+                AlbumArtColorCheck.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+            UpdateCheckStates();
+        }
+
+        if (sender == AnimatedGradientCheck)
+        {
+            AnimatedGradientPanel.Visibility =
+                AnimatedGradientCheck.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+            UpdateCheckStates();
+        }
+
+        if (sender == ColorThemeCombo)
+        {
+            UpdateCheckStates();
+        }
+
         _settingsManager.Update(s =>
         {
             var mode = GetSelected(VisualizerModeCombo);
@@ -213,16 +283,22 @@ public partial class SettingsWindow : Window
             if (!s.Visualizer.ModeSettings.ContainsKey(mode))
                 s.Visualizer.ModeSettings[mode] = new ModeSettings();
             s.Visualizer.ModeSettings[mode].ColorTheme = GetSelected(ColorThemeCombo);
-            s.Visualizer.ModeSettings[mode].CustomColorR = (int)CustomRSlider.Value;
-            s.Visualizer.ModeSettings[mode].CustomColorG = (int)CustomGSlider.Value;
-            s.Visualizer.ModeSettings[mode].CustomColorB = (int)CustomBSlider.Value;
-            UpdateColorPreview();
+            s.Visualizer.ModeSettings[mode].CustomColorR = _customColorRows.Count > 0 ? (int)_customColorRows[0].R.Value : 0;
+            s.Visualizer.ModeSettings[mode].CustomColorG = _customColorRows.Count > 0 ? (int)_customColorRows[0].G.Value : 204;
+            s.Visualizer.ModeSettings[mode].CustomColorB = _customColorRows.Count > 0 ? (int)_customColorRows[0].B.Value : 255;
+            s.Visualizer.ModeSettings[mode].CustomGradientColors = BuildCustomGradientColors();
             s.Visualizer.ModeSettings[mode].Opacity = OpacitySlider.Value;
             s.Visualizer.ModeSettings[mode].BarCount = (int)BarCountSlider.Value;
             s.Visualizer.ModeSettings[mode].Sensitivity = SensitivitySlider.Value;
             s.Visualizer.ModeSettings[mode].Threshold = ThresholdSlider.Value;
             s.Visualizer.ModeSettings[mode].BarStartOffset = (int)BarStartOffsetSlider.Value;
             s.Visualizer.ModeSettings[mode].ShowPeak = ShowPeakCheck.IsChecked ?? true;
+            s.Visualizer.ModeSettings[mode].AlbumArtColor = AlbumArtColorCheck.IsChecked ?? false;
+            s.Visualizer.ModeSettings[mode].AlbumArtMinLightness = AlbumArtMinLightnessSlider.Value;
+            s.Visualizer.ModeSettings[mode].AlbumArtMaxLightness = AlbumArtMaxLightnessSlider.Value;
+            s.Visualizer.ModeSettings[mode].AnimatedGradientEnabled = AnimatedGradientCheck.IsChecked ?? false;
+            s.Visualizer.ModeSettings[mode].AnimatedGradientDirection = GetSelected(AnimatedDirectionCombo);
+            s.Visualizer.ModeSettings[mode].AnimatedGradientSpeed = AnimatedSpeedSlider.Value;
 
             s.Taskbar.Position = GetSelected(PositionCombo);
             s.Taskbar.WidgetWidth = (int)WidthSlider.Value;
@@ -230,6 +306,7 @@ public partial class SettingsWindow : Window
             s.Taskbar.WidgetPaddingX = (int)PaddingXSlider.Value;
             s.Taskbar.WidgetPaddingY = (int)PaddingYSlider.Value;
             s.Taskbar.VisualizerHeight = (int)VisualizerHeightSlider.Value;
+            s.Taskbar.VisualizerOffsetY = (int)VisualizerOffsetYSlider.Value;
             s.Taskbar.ShowSongTitle = ShowSongTitleCheck.IsChecked ?? true;
             s.Taskbar.ShowAlbumArt = ShowAlbumArtCheck.IsChecked ?? true;
             s.Taskbar.AutoHide = AutoHideCheck.IsChecked ?? false;
@@ -249,6 +326,8 @@ public partial class SettingsWindow : Window
             s.Taskbar.AlbumArtCornerRadius = (int)AlbumArtRadiusSlider.Value;
             s.Taskbar.AlbumArtOpacity = AlbumArtOpacitySlider.Value;
 
+            s.Taskbar.TitleOpacity = TitleOpacitySlider.Value;
+
             s.Taskbar.DoubleClickAction = GetSelected(DoubleClickActionCombo);
             s.Taskbar.DoubleClickValue = DoubleClickValueBox.Text;
             UpdateDoubleClickValueVisibility();
@@ -265,6 +344,7 @@ public partial class SettingsWindow : Window
         App.SetStartWithWindows(StartWithWindowsCheck.IsChecked ?? false);
         ApplyAppTheme();
         UpdateSliderValueLabels();
+        UpdateColorPreview();
 
         if (Application.Current.MainWindow is MainWindow mw)
             mw.RefreshSettings();
@@ -322,7 +402,214 @@ public partial class SettingsWindow : Window
         AlbumArtRadiusValue.Text = ((int)AlbumArtRadiusSlider.Value).ToString();
         AlbumArtOpacityValue.Text = AlbumArtOpacitySlider.Value.ToString("0.0");
         VisualizerHeightValue.Text = ((int)VisualizerHeightSlider.Value).ToString();
+        VisualizerOffsetYValue.Text = ((int)VisualizerOffsetYSlider.Value).ToString();
+        TitleOpacityValue.Text = TitleOpacitySlider.Value.ToString("0.0");
+        AlbumArtMinLightnessValue.Text = AlbumArtMinLightnessSlider.Value.ToString("0.0");
+        AlbumArtMaxLightnessValue.Text = AlbumArtMaxLightnessSlider.Value.ToString("0.0");
+        AnimatedDirectionValue.Text = GetSelected(AnimatedDirectionCombo);
+        AnimatedSpeedValue.Text = AnimatedSpeedSlider.Value.ToString("0.0");
+        foreach (var row in _customColorRows)
+        {
+            row.RText.Text = ((int)row.R.Value).ToString();
+            row.GText.Text = ((int)row.G.Value).ToString();
+            row.BText.Text = ((int)row.B.Value).ToString();
+        }
         CornerRadiusValue.Text = ((int)CornerRadiusSlider.Value).ToString();
+    }
+
+    private void UpdateCheckStates()
+    {
+        bool albumArtChecked = AlbumArtColorCheck.IsChecked == true;
+        bool animatedChecked = AnimatedGradientCheck.IsChecked == true;
+        bool isCustom = GetSelected(ColorThemeCombo) == "Custom";
+        int gradientColorCount = _customColorRows.Count;
+
+        ColorThemeCombo.IsEnabled = !albumArtChecked;
+        AlbumArtColorCheck.IsEnabled = !animatedChecked;
+
+        if (isCustom)
+            AnimatedGradientCheck.IsEnabled = gradientColorCount >= 2;
+        else
+            AnimatedGradientCheck.IsEnabled = true;
+
+        if (AnimatedGradientCheck.IsEnabled == false)
+            AnimatedGradientCheck.IsChecked = false;
+    }
+
+    private List<string> BuildCustomGradientColors()
+    {
+        var list = new List<string>();
+        foreach (var row in _customColorRows)
+            list.Add(ColorUtils.ToHex(Color.FromRgb((byte)row.R.Value, (byte)row.G.Value, (byte)row.B.Value)));
+        return list;
+    }
+
+    private void LoadCustomGradientFromSettings(List<string>? colors, byte r = 0, byte g = 204, byte b = 255)
+    {
+        CustomColorsContainer.Children.Clear();
+        _customColorRows.Clear();
+
+        if (colors == null || colors.Count == 0)
+        {
+            AddCustomColorRow(Color.FromRgb(r, g, b), canRemove: false);
+        }
+        else
+        {
+            for (int i = 0; i < colors.Count && i < MaxCustomColors; i++)
+            {
+                var parsed = ColorUtils.ParseHexColor(colors[i]);
+                AddCustomColorRow(parsed ?? (i == 0 ? Color.FromRgb(r, g, b) : Colors.White), canRemove: i > 0);
+            }
+        }
+
+        UpdateAddColorButton();
+        UpdateCustomGradientPreview();
+    }
+
+    private CustomColorRow AddCustomColorRow(Color color, bool canRemove)
+    {
+        var row = new CustomColorRow();
+
+        var border = new Border { Margin = new Thickness(0, 8, 0, 0) };
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 0 = swatch
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // 1 = R
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) }); // 2 = gap
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // 3 = G
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) }); // 4 = gap
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // 5 = B
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // 6 = remove btn
+
+        // Swatch
+        var swatch = new Border
+        {
+            Width = 16, Height = 16, CornerRadius = new CornerRadius(3),
+            Background = new SolidColorBrush(color),
+            BorderThickness = new Thickness(1),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        swatch.SetResourceReference(Border.BorderBrushProperty, "CardBorder");
+        Grid.SetColumn(swatch, 0);
+        grid.Children.Add(swatch);
+        row.Swatch = swatch;
+
+        // R/G/B slider helpers
+        void AddSliderColumn(int col, string label, byte value, Brush labelColor, out Slider slider, out TextBlock text)
+        {
+            var innerGrid = new Grid();
+            innerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            innerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            innerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var labelTb = new TextBlock
+            {
+                Text = label, Foreground = labelColor,
+                Width = 14, VerticalAlignment = VerticalAlignment.Center, FontSize = 12
+            };
+            Grid.SetColumn(labelTb, 0);
+            innerGrid.Children.Add(labelTb);
+
+            slider = new Slider { Minimum = 0, Maximum = 255, TickFrequency = 1, Value = value };
+            slider.ValueChanged += OnSettingChanged;
+            Grid.SetColumn(slider, 1);
+            innerGrid.Children.Add(slider);
+
+            text = new TextBlock
+            {
+                Text = ((int)value).ToString(), Width = 26,
+                VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Right
+            };
+            text.SetResourceReference(TextBlock.StyleProperty, "SliderValue");
+            Grid.SetColumn(text, 2);
+            innerGrid.Children.Add(text);
+
+            Grid.SetColumn(innerGrid, col);
+            grid.Children.Add(innerGrid);
+        }
+
+        AddSliderColumn(1, "R", color.R, new SolidColorBrush(Color.FromRgb(0xFF, 0x44, 0x44)), out var sliderR, out var textR);
+        row.R = sliderR;
+        row.RText = textR;
+        AddSliderColumn(3, "G", color.G, new SolidColorBrush(Color.FromRgb(0x44, 0xFF, 0x44)), out var sliderG, out var textG);
+        row.G = sliderG;
+        row.GText = textG;
+        AddSliderColumn(5, "B", color.B, new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0xFF)), out var sliderB, out var textB);
+        row.B = sliderB;
+        row.BText = textB;
+
+        // Remove button
+        if (canRemove)
+        {
+            var removeBtn = new Button
+            {
+                Content = "−", Width = 22, Height = 22, FontSize = 14,
+                Padding = new Thickness(0), Margin = new Thickness(4, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                BorderThickness = new Thickness(0), Foreground = Brushes.White
+            };
+            removeBtn.SetResourceReference(Button.BackgroundProperty, "CardBorder");
+            int capturedIndex = _customColorRows.Count;
+            removeBtn.Click += (_, _) => RemoveCustomColorAt(capturedIndex);
+            Grid.SetColumn(removeBtn, 6);
+            grid.Children.Add(removeBtn);
+        }
+
+        border.Child = grid;
+        CustomColorsContainer.Children.Add(border);
+        row.Container = border;
+        _customColorRows.Add(row);
+        return row;
+    }
+
+    private void UpdateAddColorButton()
+    {
+        AddColorBtn.Visibility = _customColorRows.Count >= MaxCustomColors
+            ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void UpdateCustomGradientPreview()
+    {
+        var colors = new List<Color>();
+        foreach (var row in _customColorRows)
+        {
+            var c = Color.FromRgb((byte)row.R.Value, (byte)row.G.Value, (byte)row.B.Value);
+            colors.Add(c);
+            row.Swatch.Background = new SolidColorBrush(c);
+        }
+
+        var brush = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
+        if (colors.Count == 1)
+        {
+            brush.GradientStops.Add(new GradientStop(colors[0], 0));
+            brush.GradientStops.Add(new GradientStop(colors[0], 1));
+        }
+        else
+        {
+            for (int i = 0; i < colors.Count; i++)
+                brush.GradientStops.Add(new GradientStop(colors[i], (double)i / (colors.Count - 1)));
+        }
+        CustomGradientPreview.Background = brush;
+    }
+
+    private void AddColor_Click(object sender, RoutedEventArgs e)
+    {
+        if (_customColorRows.Count >= MaxCustomColors) return;
+        AddCustomColorRow(Colors.White, canRemove: true);
+        UpdateAddColorButton();
+        UpdateCustomGradientPreview();
+        UpdateCheckStates();
+        OnSettingChanged(sender, e);
+    }
+
+    private void RemoveCustomColorAt(int index)
+    {
+        if (index < 0 || index >= _customColorRows.Count) return;
+        CustomColorsContainer.Children.Remove(_customColorRows[index].Container);
+        _customColorRows.RemoveAt(index);
+        UpdateAddColorButton();
+        UpdateCustomGradientPreview();
+        UpdateCheckStates();
+        OnSettingChanged(null, null!);
     }
 
     private void UpdateColorPreview()
@@ -331,19 +618,64 @@ public partial class SettingsWindow : Window
         bool isCustom = theme == "Custom";
         CustomColorPanel.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
 
+        var albumColor = MainWindow.CurrentAlbumArtColor;
+        if (AlbumArtColorCheck.IsChecked == true)
+        {
+            if (albumColor != default && albumColor != Colors.Transparent)
+            {
+                var min = AlbumArtMinLightnessSlider.Value;
+                var max = AlbumArtMaxLightnessSlider.Value;
+                var clamped = ColorUtils.ClampLightness(albumColor, min, max);
+                ColorPreview.Background = new SolidColorBrush(clamped);
+            }
+            else
+            {
+                ColorPreview.Background = new SolidColorBrush(Color.FromRgb(80, 80, 80));
+                ColorPreview.Opacity = 0.4;
+                return;
+            }
+            ColorPreview.Opacity = 1.0;
+            return;
+        }
+
+        ColorPreview.Opacity = 1.0;
+
         if (isCustom)
         {
-            var r = (byte)CustomRSlider.Value;
-            var g = (byte)CustomGSlider.Value;
-            var b = (byte)CustomBSlider.Value;
-            ColorPreview.Background = new SolidColorBrush(Color.FromRgb(r, g, b));
-            CustomRText.Text = r.ToString();
-            CustomGText.Text = g.ToString();
-            CustomBText.Text = b.ToString();
+            UpdateCustomGradientPreview();
+            var gradientColors = BuildCustomGradientColors();
+            var cc = _customColorRows.Count > 0
+                ? Color.FromRgb((byte)_customColorRows[0].R.Value, (byte)_customColorRows[0].G.Value, (byte)_customColorRows[0].B.Value)
+                : Color.FromRgb(0, 204, 255);
+
+            if (_customColorRows.Count > 0)
+            {
+                _customColorRows[0].RText.Text = ((int)_customColorRows[0].R.Value).ToString();
+                _customColorRows[0].GText.Text = ((int)_customColorRows[0].G.Value).ToString();
+                _customColorRows[0].BText.Text = ((int)_customColorRows[0].B.Value).ToString();
+            }
+
+            if (gradientColors.Count >= 2)
+            {
+                var grad = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
+                for (int i = 0; i < gradientColors.Count; i++)
+                {
+                    var c = ColorUtils.ParseHexColor(gradientColors[i]);
+                    if (c.HasValue)
+                        grad.GradientStops.Add(new GradientStop(c.Value, (double)i / (gradientColors.Count - 1)));
+                }
+                ColorPreview.Background = grad;
+            }
+            else
+            {
+                ColorPreview.Background = new SolidColorBrush(cc);
+            }
         }
         else
         {
-            var cc = Color.FromRgb((byte)CustomRSlider.Value, (byte)CustomGSlider.Value, (byte)CustomBSlider.Value);
+            var cc = _customColorRows.Count > 0
+                ? Color.FromRgb((byte)_customColorRows[0].R.Value, (byte)_customColorRows[0].G.Value, (byte)_customColorRows[0].B.Value)
+                : Color.FromRgb(0, 204, 255);
             var grad = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
 
             if (theme == "Rainbow")
@@ -380,15 +712,22 @@ public partial class SettingsWindow : Window
                         s.Visualizer.ModeSettings[oldMode] = new ModeSettings();
                     var sm = s.Visualizer.ModeSettings[oldMode];
                     sm.ColorTheme = GetSelected(ColorThemeCombo);
-                    sm.CustomColorR = (int)CustomRSlider.Value;
-                    sm.CustomColorG = (int)CustomGSlider.Value;
-                    sm.CustomColorB = (int)CustomBSlider.Value;
+                    sm.CustomColorR = _customColorRows.Count > 0 ? (int)_customColorRows[0].R.Value : 0;
+                    sm.CustomColorG = _customColorRows.Count > 0 ? (int)_customColorRows[0].G.Value : 204;
+                    sm.CustomColorB = _customColorRows.Count > 0 ? (int)_customColorRows[0].B.Value : 255;
+                    sm.CustomGradientColors = BuildCustomGradientColors();
                     sm.Opacity = OpacitySlider.Value;
                     sm.BarCount = (int)BarCountSlider.Value;
                     sm.Sensitivity = SensitivitySlider.Value;
                     sm.Threshold = ThresholdSlider.Value;
                     sm.BarStartOffset = (int)BarStartOffsetSlider.Value;
                     sm.ShowPeak = ShowPeakCheck.IsChecked ?? true;
+                    sm.AlbumArtColor = AlbumArtColorCheck.IsChecked ?? false;
+                    sm.AlbumArtMinLightness = AlbumArtMinLightnessSlider.Value;
+                    sm.AlbumArtMaxLightness = AlbumArtMaxLightnessSlider.Value;
+                    sm.AnimatedGradientEnabled = AnimatedGradientCheck.IsChecked ?? false;
+                    sm.AnimatedGradientDirection = GetSelected(AnimatedDirectionCombo);
+                    sm.AnimatedGradientSpeed = AnimatedSpeedSlider.Value;
                     return s;
                 });
             }
@@ -404,9 +743,7 @@ public partial class SettingsWindow : Window
         if (_settingsManager.Current.Visualizer.ModeSettings.TryGetValue(newMode, out var ms))
         {
             SelectItem(ColorThemeCombo, ms.ColorTheme);
-            CustomRSlider.Value = ms.CustomColorR;
-            CustomGSlider.Value = ms.CustomColorG;
-            CustomBSlider.Value = ms.CustomColorB;
+            LoadCustomGradientFromSettings(ms.CustomGradientColors, (byte)ms.CustomColorR, (byte)ms.CustomColorG, (byte)ms.CustomColorB);
             UpdateColorPreview();
             OpacitySlider.Value = ms.Opacity;
             BarCountSlider.Value = ms.BarCount;
@@ -414,6 +751,15 @@ public partial class SettingsWindow : Window
             ThresholdSlider.Value = ms.Threshold;
             BarStartOffsetSlider.Value = ms.BarStartOffset;
             ShowPeakCheck.IsChecked = ms.ShowPeak;
+            AlbumArtColorCheck.IsChecked = ms.AlbumArtColor;
+            AlbumArtBrightnessPanel.Visibility = ms.AlbumArtColor ? Visibility.Visible : Visibility.Collapsed;
+            AlbumArtMinLightnessSlider.Value = ms.AlbumArtMinLightness;
+            AlbumArtMaxLightnessSlider.Value = ms.AlbumArtMaxLightness;
+            AnimatedGradientCheck.IsChecked = ms.AnimatedGradientEnabled;
+            AnimatedGradientPanel.Visibility = ms.AnimatedGradientEnabled ? Visibility.Visible : Visibility.Collapsed;
+            SelectItem(AnimatedDirectionCombo, ms.AnimatedGradientDirection);
+            AnimatedSpeedSlider.Value = ms.AnimatedGradientSpeed;
+            UpdateCheckStates();
         }
 
         UpdateBarCountTickFrequency();
@@ -451,13 +797,17 @@ public partial class SettingsWindow : Window
             combo.SelectedIndex = 0;
     }
 
-    private static void BlockComboScroll(ComboBox combo)
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent) where T : DependencyObject
     {
-        combo.PreviewMouseWheel += (_, e) =>
+        int count = VisualTreeHelper.GetChildrenCount(parent);
+        for (int i = 0; i < count; i++)
         {
-            if (!combo.IsDropDownOpen)
-                e.Handled = true;
-        };
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T t)
+                yield return t;
+            foreach (var descendant in FindVisualChildren<T>(child))
+                yield return descendant;
+        }
     }
 
     private static string GetSelected(ComboBox combo)
@@ -525,10 +875,14 @@ public partial class SettingsWindow : Window
         var padding = ps?.Padding ?? 0;
         var width = ps?.Width ?? -1;
         var enabled = ps?.Enabled ?? true;
+        var opacity = ps?.Opacity ?? 1.0;
+        var verticalOffset = ps?.VerticalOffset ?? 0;
 
         SelectItem(PluginAlignmentCombo, alignment);
         PluginPaddingSlider.Value = padding;
         PluginEnabledCheck.IsChecked = enabled;
+        PluginOpacitySlider.Value = opacity;
+        PluginVerticalOffsetSlider.Value = verticalOffset;
         
         if (width > 0)
         {
@@ -553,6 +907,8 @@ public partial class SettingsWindow : Window
     {
         PluginPaddingValue.Text = ((int)PluginPaddingSlider.Value).ToString();
         PluginWidthValue.Text = ((int)PluginWidthSlider.Value).ToString();
+        PluginOpacityValue.Text = PluginOpacitySlider.Value.ToString("0.0");
+        PluginVerticalOffsetValue.Text = ((int)PluginVerticalOffsetSlider.Value).ToString();
         PluginWidthPanel.Visibility = (PluginCustomWidthCheck.IsChecked == true) 
             ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -580,6 +936,8 @@ public partial class SettingsWindow : Window
             ps.Alignment = GetSelected(PluginAlignmentCombo);
             ps.Padding = (int)PluginPaddingSlider.Value;
             ps.Enabled = PluginEnabledCheck.IsChecked ?? true;
+            ps.Opacity = PluginOpacitySlider.Value;
+            ps.VerticalOffset = (int)PluginVerticalOffsetSlider.Value;
             
             if (PluginCustomWidthCheck.IsChecked == true)
             {
@@ -625,7 +983,7 @@ public partial class SettingsWindow : Window
 
             foreach (var def in defs)
             {
-                string currentValue = null;
+                string? currentValue = null;
                 if (ps != null && ps.CustomSettings != null)
                 {
                     ps.CustomSettings.TryGetValue(def.Key, out currentValue);
@@ -914,5 +1272,45 @@ public partial class SettingsWindow : Window
     {
         _settingsManager.ResetToDefaults();
         LoadSettings();
+    }
+
+    private void OnTabControlPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (IsMouseOverComboBox(Mouse.DirectlyOver as DependencyObject))
+        {
+            return;
+        }
+
+        if (sender is TabControl tc && tc.SelectedContent is ScrollViewer sv)
+        {
+            sv.ScrollToVerticalOffset(sv.VerticalOffset - e.Delta);
+            e.Handled = true;
+        }
+
+        static bool IsMouseOverComboBox(DependencyObject? obj)
+        {
+            while (obj != null)
+            {
+                if (obj is ComboBox || obj is ComboBoxItem)
+                {
+                    return true;
+                }
+
+                var parent = VisualTreeHelper.GetParent(obj);
+                if (parent == null)
+                {
+                    if (obj is FrameworkElement fe)
+                    {
+                        parent = fe.Parent ?? fe.TemplatedParent;
+                    }
+                    else if (obj is FrameworkContentElement fce)
+                    {
+                        parent = fce.Parent ?? fce.TemplatedParent;
+                    }
+                }
+                obj = parent;
+            }
+            return false;
+        }
     }
 }

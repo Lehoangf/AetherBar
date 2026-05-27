@@ -38,15 +38,19 @@
         </StackPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                     VerticalAlignment="Center">
-            <Button x:Name="PowerBtn" Content="⏻"
-                    FontFamily="Segoe UI Symbol, Segoe UI, Arial" FontSize="16"
+            <Button x:Name="PowerBtn"
                     Width="40" Height="28"
                     VerticalAlignment="Center" VerticalContentAlignment="Center"
                     Padding="0"
                     Background="Transparent" Foreground="{DynamicResource FluentAccent}"
                     BorderThickness="0"
                     ToolTip="Exit AetherBar"
-                    Click="OnPowerClick"/>
+                    Click="OnPowerClick">
+                <Path Data="M27.18,6.46c0-1.2-.98-2.18-2.18-2.18s-2.18.98-2.18,2.18v19.63c0,1.2.98,2.18,2.18,2.18s2.18-.98,2.18-2.18V6.46ZM17.6,12.73c1.05-.58,1.43-1.91.85-2.97-.58-1.05-1.91-1.43-2.97-.85-6.03,3.35-10.12,9.78-10.12,17.18,0,10.84,8.79,19.63,19.63,19.63s19.63-8.79,19.63-19.63c0-7.27-3.95-13.61-9.81-17-1.04-.6-2.38-.25-2.98.8-.6,1.04-.25,2.38.8,2.98,4.57,2.64,7.64,7.58,7.64,13.23,0,8.43-6.84,15.27-15.27,15.27s-15.27-6.84-15.27-15.27c0-5.75,3.17-10.75,7.87-13.36Z"
+                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                      Width="14" Height="14"
+                      Stretch="Uniform"/>
+            </Button>
             <Button x:Name="MinimizeBtn" Content="&#xE921;"
                     FontFamily="Segoe MDL2 Assets" FontSize="10"
                     Width="40" Height="28"
@@ -66,7 +70,8 @@
 
             <!-- Content -->
             <TabControl Grid.Row="1" Style="{StaticResource FluentTabControl}"
-                        Background="Transparent">
+                        Background="Transparent"
+                        PreviewMouseWheel="OnTabControlPreviewMouseWheel">
 
                 <!-- === VISUALIZER TAB === -->
                 <TabItem Header="Visualizer" Tag="&#xE763;">
@@ -112,55 +117,84 @@
                                             BorderThickness="1" BorderBrush="{DynamicResource CardBorder}"
                                             Padding="12" Margin="0,12,0,0">
                                         <StackPanel>
-                                            <TextBlock Text="CUSTOM COLOR" Style="{StaticResource SectionHeader}" Margin="0,0,8,0"/>
+                                            <TextBlock Text="CUSTOM GRADIENT" Style="{StaticResource SectionHeader}" Margin="0,0,8,0"/>
+                                            <Border x:Name="CustomGradientPreview" Height="20" CornerRadius="4"
+                                                    Background="#FF4444" BorderThickness="1" BorderBrush="{DynamicResource CardBorder}"
+                                                    Margin="0,8,0,0"/>
+                                            <StackPanel x:Name="CustomColorsContainer" Margin="0,8,0,0"/>
+                                            <Button x:Name="AddColorBtn" Content="+ Add Color" Width="100" Height="24"
+                                                    FontSize="12" Padding="0" Margin="0,8,0,0" HorizontalAlignment="Left"
+                                                    Background="{DynamicResource CardBorder}" Foreground="White"
+                                                    BorderThickness="0" Click="AddColor_Click"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <CheckBox x:Name="AlbumArtColorCheck"
+                                              Content="Use Album Art Color"
+                                              Margin="0,12,0,0"
+                                              Checked="OnSettingChanged"
+                                              Unchecked="OnSettingChanged"/>
+
+                                    <Grid x:Name="AlbumArtBrightnessPanel" Margin="0,12,0,0" Visibility="Collapsed">
+                                        <StackPanel>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="8"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="8"/>
-                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <Grid Grid.Column="0">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="R" Foreground="#FF4444" Width="14" VerticalAlignment="Center" FontSize="12"/>
-                                                    <Slider Grid.Column="1" x:Name="CustomRSlider"
-                                                            
-                                                            Minimum="0" Maximum="255" TickFrequency="1"
-                                                            ValueChanged="OnSettingChanged"/>
-                                                    <TextBlock Grid.Column="2" x:Name="CustomRText" Text="0" Style="{StaticResource SliderValue}" Width="26"/>
-                                                </Grid>
-                                                <Grid Grid.Column="2">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="G" Foreground="#44FF44" Width="14" VerticalAlignment="Center" FontSize="12"/>
-                                                    <Slider Grid.Column="1" x:Name="CustomGSlider"
-                                                            
-                                                            Minimum="0" Maximum="255" TickFrequency="1"
-                                                            ValueChanged="OnSettingChanged"/>
-                                                    <TextBlock Grid.Column="2" x:Name="CustomGText" Text="204" Style="{StaticResource SliderValue}" Width="26"/>
-                                                </Grid>
-                                                <Grid Grid.Column="4">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="B" Foreground="#4444FF" Width="14" VerticalAlignment="Center" FontSize="12"/>
-                                                    <Slider Grid.Column="1" x:Name="CustomBSlider"
-                                                            
-                                                            Minimum="0" Maximum="255" TickFrequency="1"
-                                                            ValueChanged="OnSettingChanged"/>
-                                                    <TextBlock Grid.Column="2" x:Name="CustomBText" Text="255" Style="{StaticResource SliderValue}" Width="26"/>
-                                                </Grid>
+                                                <TextBlock Text="MIN BRIGHTNESS (DARK COLOR)" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                                <TextBlock x:Name="AlbumArtMinLightnessValue" Text="0.3" Style="{StaticResource SliderValue}" Grid.Column="1"/>
                                             </Grid>
+                                            <Slider x:Name="AlbumArtMinLightnessSlider"
+                                                    Minimum="0.0" Maximum="1.0" TickFrequency="0.05"
+                                                    ValueChanged="OnSettingChanged"/>
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="MAX BRIGHTNESS (LIGHT COLOR)" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                                <TextBlock x:Name="AlbumArtMaxLightnessValue" Text="0.85" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                            </Grid>
+                                            <Slider x:Name="AlbumArtMaxLightnessSlider"
+                                                    Minimum="0.0" Maximum="1.0" TickFrequency="0.05"
+                                                    ValueChanged="OnSettingChanged"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <CheckBox x:Name="AnimatedGradientCheck"
+                                              Content="Animated Gradient"
+                                              Margin="0,12,0,0"
+                                              Checked="OnSettingChanged"
+                                              Unchecked="OnSettingChanged"/>
+
+                                    <Border x:Name="AnimatedGradientPanel" Visibility="Collapsed"
+                                            Background="{DynamicResource CustomColorPanelBg}" CornerRadius="6"
+                                            BorderThickness="1" BorderBrush="{DynamicResource CardBorder}"
+                                            Padding="12" Margin="0,12,0,0">
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="DIRECTION" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                                <TextBlock x:Name="AnimatedDirectionValue" Text="MoveRight" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                            </Grid>
+                                            <ComboBox x:Name="AnimatedDirectionCombo"
+                                                      SelectedIndex="0"
+                                                      SelectionChanged="OnSettingChanged"/>
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="SPEED" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                                <TextBlock x:Name="AnimatedSpeedValue" Text="1.0" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                            </Grid>
+                                            <Slider x:Name="AnimatedSpeedSlider"
+                                                    Minimum="0.1" Maximum="5.0" TickFrequency="0.1"
+                                                    ValueChanged="OnSettingChanged"/>
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>
@@ -254,6 +288,18 @@
                                     <Slider x:Name="VisualizerHeightSlider"
                                             
                                             Minimum="10" Maximum="48" TickFrequency="2"
+                                            ValueChanged="OnSettingChanged"/>
+
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="VISUALIZER VERTICAL OFFSET" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                        <TextBlock x:Name="VisualizerOffsetYValue" Text="0" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                    </Grid>
+                                    <Slider x:Name="VisualizerOffsetYSlider"
+                                            Minimum="-20" Maximum="20" TickFrequency="1"
                                             ValueChanged="OnSettingChanged"/>
                                 </StackPanel>
                             </Border>
@@ -465,6 +511,25 @@
                                 </StackPanel>
                             </Border>
 
+                            <!-- Card: Content Opacity -->
+                            <Border Style="{StaticResource FluentCard}">
+                                <StackPanel>
+                                    <TextBlock Text="CONTENT OPACITY" Style="{StaticResource CardTitle}"/>
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="TITLE OPACITY" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                        <TextBlock x:Name="TitleOpacityValue" Text="1.0" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                    </Grid>
+                                    <Slider x:Name="TitleOpacitySlider"
+                                            
+                                            Minimum="0.1" Maximum="1.0" TickFrequency="0.1"
+                                            ValueChanged="OnSettingChanged"/>
+                                </StackPanel>
+                            </Border>
+
                             <!-- Card: Widget Events -->
                             <Border Style="{StaticResource FluentCard}">
                                 <StackPanel>
@@ -571,56 +636,6 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Card: Layout & Styling -->
-                                <Border Style="{StaticResource FluentCard}">
-                                    <StackPanel>
-                                        <TextBlock Text="LAYOUT &amp; ALIGNMENT" Style="{StaticResource CardTitle}"/>
-
-                                        <CheckBox x:Name="PluginEnabledCheck"
-                                                  Content="Enable Plugin"
-                                                  Margin="0,0,0,12"
-                                                  Checked="OnPluginSettingChanged"
-                                                  Unchecked="OnPluginSettingChanged"/>
-                                        
-                                        <TextBlock Text="ALIGNMENT" Style="{StaticResource SectionHeader}"/>
-                                        <ComboBox x:Name="PluginAlignmentCombo"
-                                                  SelectionChanged="OnPluginSettingChanged"/>
-
-                                        <Grid Margin="0,12,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="HORIZONTAL SHIFT / OFFSET" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
-                                            <TextBlock x:Name="PluginPaddingValue" Text="0" Style="{StaticResource SliderValue}" Grid.Column="1"/>
-                                        </Grid>
-                                        <Slider x:Name="PluginPaddingSlider"
-                                                Minimum="-150" Maximum="150" TickFrequency="5"
-                                                ValueChanged="OnPluginSettingChanged"/>
-
-                                        <CheckBox x:Name="PluginCustomWidthCheck"
-                                                  Content="Enable Custom Width"
-                                                  Margin="0,16,0,0"
-                                                  Checked="OnPluginSettingChanged"
-                                                  Unchecked="OnPluginSettingChanged"/>
-
-                                        <StackPanel x:Name="PluginWidthPanel" Margin="0,12,0,0">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="CUSTOM WIDTH" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
-                                                <TextBlock x:Name="PluginWidthValue" Text="150" Style="{StaticResource SliderValue}" Grid.Column="1"/>
-                                            </Grid>
-                                            <Slider x:Name="PluginWidthSlider"
-                                                    Minimum="50" Maximum="400" TickFrequency="5"
-                                                    ValueChanged="OnPluginSettingChanged"/>
-                                        </StackPanel>
-
-                                    </StackPanel>
-                                </Border>
-
                                 <!-- Card: Plugin Ordering (Drag and Drop) -->
                                 <Border Style="{StaticResource FluentCard}">
                                     <StackPanel>
@@ -691,6 +706,80 @@
                                                  </Style>
                                              </ListBox.ItemContainerStyle>
                                          </ListBox>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Card: Layout & Styling -->
+                                <Border Style="{StaticResource FluentCard}">
+                                    <StackPanel>
+                                        <TextBlock Text="LAYOUT &amp; ALIGNMENT" Style="{StaticResource CardTitle}"/>
+
+                                        <CheckBox x:Name="PluginEnabledCheck"
+                                                  Content="Enable Plugin"
+                                                  Margin="0,0,0,12"
+                                                  Checked="OnPluginSettingChanged"
+                                                  Unchecked="OnPluginSettingChanged"/>
+                                        
+                                        <TextBlock Text="ALIGNMENT" Style="{StaticResource SectionHeader}"/>
+                                        <ComboBox x:Name="PluginAlignmentCombo"
+                                                  SelectionChanged="OnPluginSettingChanged"/>
+
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="OPACITY" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                            <TextBlock x:Name="PluginOpacityValue" Text="1.0" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                        </Grid>
+                                        <Slider x:Name="PluginOpacitySlider"
+                                                Minimum="0.1" Maximum="1.0" TickFrequency="0.1"
+                                                ValueChanged="OnPluginSettingChanged"/>
+
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="HORIZONTAL SHIFT / OFFSET" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                            <TextBlock x:Name="PluginPaddingValue" Text="0" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                        </Grid>
+                                        <Slider x:Name="PluginPaddingSlider"
+                                                Minimum="-150" Maximum="150" TickFrequency="5"
+                                                ValueChanged="OnPluginSettingChanged"/>
+
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="VERTICAL OFFSET" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                            <TextBlock x:Name="PluginVerticalOffsetValue" Text="0" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                        </Grid>
+                                        <Slider x:Name="PluginVerticalOffsetSlider"
+                                                Minimum="-20" Maximum="20" TickFrequency="1"
+                                                ValueChanged="OnPluginSettingChanged"/>
+
+                                        <CheckBox x:Name="PluginCustomWidthCheck"
+                                                  Content="Enable Custom Width"
+                                                  Margin="0,16,0,0"
+                                                  Checked="OnPluginSettingChanged"
+                                                  Unchecked="OnPluginSettingChanged"/>
+
+                                        <StackPanel x:Name="PluginWidthPanel" Margin="0,12,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="CUSTOM WIDTH" Style="{StaticResource SectionHeader}" Grid.Column="0"/>
+                                                <TextBlock x:Name="PluginWidthValue" Text="150" Style="{StaticResource SliderValue}" Grid.Column="1"/>
+                                            </Grid>
+                                            <Slider x:Name="PluginWidthSlider"
+                                                    Minimum="50" Maximum="400" TickFrequency="5"
+                                                    ValueChanged="OnPluginSettingChanged"/>
+                                        </StackPanel>
+
                                     </StackPanel>
                                 </Border>
 

@@ -16,6 +16,7 @@ public interface IPluginContext
     nint TaskbarHwnd { get; }
     PluginWidget CreateWidget(string name, int width, int height);
     void Log(string message);
+    IMediaController? MediaController { get; }
 }
 
 public class PluginWidget : IDisposable
@@ -30,6 +31,11 @@ public class PluginWidget : IDisposable
     private Action<string>? _updateTextColor;
     private Action<string, string>? _updateLineColors;
     private Action<string?>? _updateTooltip;
+    private Action<double>? _updateOpacity;
+    private Action<IList<string>>? _updateIcons;
+    private Action<string>? _updateIconColor;
+    private Action<double>? _updateIconSize;
+    private Action<double>? _updateIconSpacing;
 
     public Action<string, double, double>? OnMouseClick { get; set; }
     public Action<string, double, double>? OnMouseDoubleClick { get; set; }
@@ -44,7 +50,12 @@ public class PluginWidget : IDisposable
         Action<double>? updateVerticalOffset = null,
         Action<string>? updateTextColor = null,
         Action<string, string>? updateLineColors = null,
-        Action<string?>? updateTooltip = null)
+        Action<string?>? updateTooltip = null,
+        Action<double>? updateOpacity = null,
+        Action<IList<string>>? updateIcons = null,
+        Action<string>? updateIconColor = null,
+        Action<double>? updateIconSize = null,
+        Action<double>? updateIconSpacing = null)
     {
         Name = name;
         Width = width;
@@ -55,6 +66,11 @@ public class PluginWidget : IDisposable
         _updateTextColor = updateTextColor;
         _updateLineColors = updateLineColors;
         _updateTooltip = updateTooltip;
+        _updateOpacity = updateOpacity;
+        _updateIcons = updateIcons;
+        _updateIconColor = updateIconColor;
+        _updateIconSize = updateIconSize;
+        _updateIconSpacing = updateIconSpacing;
     }
 
     public void SetHandle(nint handle) => Handle = handle;
@@ -129,6 +145,61 @@ public class PluginWidget : IDisposable
         try
         {
             _updateTooltip?.Invoke(text);
+        }
+        catch
+        {
+        }
+    }
+
+    public void SetOpacity(double opacity)
+    {
+        try
+        {
+            _updateOpacity?.Invoke(opacity);
+        }
+        catch
+        {
+        }
+    }
+
+    public void SetIcons(IList<string> iconNames)
+    {
+        try
+        {
+            _updateIcons?.Invoke(iconNames);
+        }
+        catch
+        {
+        }
+    }
+
+    public void SetIconColor(string color)
+    {
+        try
+        {
+            _updateIconColor?.Invoke(color);
+        }
+        catch
+        {
+        }
+    }
+
+    public void SetIconSize(double size)
+    {
+        try
+        {
+            _updateIconSize?.Invoke(size);
+        }
+        catch
+        {
+        }
+    }
+
+    public void SetIconSpacing(double spacing)
+    {
+        try
+        {
+            _updateIconSpacing?.Invoke(spacing);
         }
         catch
         {

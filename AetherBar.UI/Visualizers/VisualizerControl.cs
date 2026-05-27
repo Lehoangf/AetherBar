@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Media;
 using AetherBar.Core.Visualizer;
@@ -9,10 +10,12 @@ public class VisualizerControl : FrameworkElement
     private VisualizerController? _controller;
     private float[] _fftData = Array.Empty<float>();
     private float _peakLevel;
+    private long _startTicks;
 
     public VisualizerControl()
     {
         SnapsToDevicePixels = true;
+        _startTicks = DateTime.UtcNow.Ticks;
     }
 
     public void SetController(VisualizerController controller)
@@ -40,7 +43,8 @@ public class VisualizerControl : FrameworkElement
         var renderer = controller?.CurrentRenderer;
         if (renderer != null && _fftData.Length > 0)
         {
-            renderer.Render(ctx, _fftData, _peakLevel, new Size(w, h), controller!.Options);
+            controller!.Options.AnimationTime = (DateTime.UtcNow.Ticks - _startTicks) / 10_000_000.0;
+            renderer.Render(ctx, _fftData, _peakLevel, new Size(w, h), controller.Options);
         }
     }
 

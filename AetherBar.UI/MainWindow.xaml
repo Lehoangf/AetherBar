@@ -24,16 +24,15 @@
             Margin="2">
         <Grid VerticalAlignment="Center" ClipToBounds="True">
             <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Album Art (Row 0, Col 0, spans 2 rows) -->
+            <!-- Album Art (Row 0-1, Col 0) -->
             <Border x:Name="AlbumArtBorder"
                     Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
                     Width="24" Height="24"
@@ -47,60 +46,38 @@
                        Stretch="UniformToFill"/>
             </Border>
 
-            <!-- Media Buttons (Row 0, Col 1) -->
-            <StackPanel x:Name="MediaButtonsPanel"
-                        Grid.Row="0" Grid.Column="1"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center"
-                        Margin="1,0,2,0"
-                        Visibility="Collapsed">
-                <TextBlock x:Name="BtnPrev" Text="⏮" FontSize="11"
-                           Padding="2,0" VerticalAlignment="Center"
-                           Cursor="Hand" Foreground="White"
-                           MouseDown="OnMediaPrevClick"/>
-                <TextBlock x:Name="BtnPlayPause" Text="▶" FontSize="11"
-                           Padding="2,0" VerticalAlignment="Center"
-                           Cursor="Hand" Foreground="White"
-                           MouseDown="OnMediaPlayPauseClick"/>
-                <TextBlock x:Name="BtnNext" Text="⏭" FontSize="11"
-                           Padding="2,0" VerticalAlignment="Center"
-                           Cursor="Hand" Foreground="White"
-                           MouseDown="OnMediaNextClick"/>
-            </StackPanel>
+            <!-- Visualizer area (Row 0, Col 1) + plugin panels -->
+            <Grid x:Name="VisualizerRow" Grid.Row="0" Grid.Column="1" ClipToBounds="True">
+                <Grid.RenderTransform>
+                    <TranslateTransform x:Name="VisualizerOffsetTransform" X="0" Y="0"/>
+                </Grid.RenderTransform>
+                <vis:VisualizerControl x:Name="VisualizerControl"
+                                       HorizontalAlignment="Stretch"
+                                       VerticalAlignment="Stretch"/>
+                <StackPanel x:Name="PluginPanelCenter"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Panel.ZIndex="1" />
+                <StackPanel x:Name="PluginPanelLeft"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Left"
+                            Margin="2,0,0,0"
+                            Panel.ZIndex="1" />
+                <StackPanel x:Name="PluginPanelRight"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right"
+                            Margin="0,0,2,0"
+                            Panel.ZIndex="1" />
+            </Grid>
 
-            <!-- Visualizer (Row 0, Col 2) -->
-            <vis:VisualizerControl x:Name="VisualizerControl"
-                                   Grid.Row="0" Grid.Column="2"
-                                   Height="22"
-                                   Margin="2,0,4,0"
-                                   VerticalAlignment="Center"
-                                   Visibility="Visible"/>
-
-            <!-- Plugin Panels (Row 0, Col 2, overlapping) -->
-            <StackPanel x:Name="PluginPanelLeft"
-                        Grid.Row="0" Grid.Column="2"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Left"
-                        Panel.ZIndex="2" />
-            <StackPanel x:Name="PluginPanelCenter"
-                        Grid.Row="0" Grid.Column="2"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Center"
-                        Panel.ZIndex="2" />
-            <StackPanel x:Name="PluginPanelRight"
-                        Grid.Row="0" Grid.Column="2"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Right"
-                        Panel.ZIndex="2" />
-
-            <!-- Song Title (Row 1, Col 0, spans 3 columns) -->
+            <!-- Song Title (Row 1, Col 1) -->
             <Canvas x:Name="TitleClip"
-                    Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                    Grid.Row="1" Grid.Column="1"
                     ClipToBounds="True"
-                    Margin="2,0,4,1">
+                    Margin="4,0,4,1">
                 <TextBlock x:Name="SongInfoText"
                            FontSize="10"
                            Foreground="#BBFFFFFF"

@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Media;
 
@@ -10,6 +11,11 @@ public class BarVisualizer : IVisualizerRenderer
     public void Render(DrawingContext context, float[] fftData, float peakLevel, Size size, RenderOptions options)
     {
         if (fftData.Length == 0) return;
+
+        var animated = options.AnimatedGradientEnabled;
+        var animTime = options.AnimationTime;
+        var animDir = options.AnimatedGradientDirection;
+        var animSpeed = options.AnimatedGradientSpeed;
 
         int offset = Math.Min(options.BarStartOffset, fftData.Length - 1);
         int effectiveLength = fftData.Length - offset;
@@ -28,7 +34,13 @@ public class BarVisualizer : IVisualizerRenderer
 
             if (barHeight < 0.5) continue;
 
-            var color = GetThemeColor(options.ColorTheme, (float)i / barCount, value, options.CustomColor);
+            float t = (float)i / barCount;
+            float intensity = value;
+
+            if (animated)
+                t = GetAnimatedT(t, animTime, animDir, animSpeed);
+
+            var color = GetThemeColor(options.ColorTheme, t, intensity, options.CustomColor, options.CustomGradientColors);
             byte alpha = (byte)(options.Opacity * 255);
 
             context.DrawRectangle(new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B)), null,
@@ -37,17 +49,58 @@ public class BarVisualizer : IVisualizerRenderer
 
         if (options.ShowPeak && peakLevel > 0.01f)
         {
-            var peakColor = GetThemeColor(options.ColorTheme, 0.5f, 1, options.CustomColor);
+            var peakColor = GetThemeColor(options.ColorTheme, 0.5f, 1, options.CustomColor, options.CustomGradientColors);
             context.DrawRectangle(new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)), null,
                 new Rect(0, centerY - peakLevel * size.Height * 0.9, size.Width, 2));
         }
     }
 
-    public static Color GetThemeColor(string theme, float t, float intensity, Color customColor)
+    public static float GetAnimatedT(float t, double time, string direction, double speed)
+    {
+        if (direction == "Wave")
+        {
+            // Wave: smooth sin oscillation with reflection at boundaries (no hard wrap)
+            double phase = time * speed * 2.0 * Math.PI;
+            float wave = (float)(Math.Sin(phase) * 0.5);
+            float result = t + wave;
+            if (result < 0) result = -result;
+            if (result > 1) result = 2 - result;
+            return result;
+        }
+
+        // MoveLeft/MoveRight: triangle wave for smooth boomerang effect
+        double raw = direction switch
+        {
+            "MoveLeft" => t - time * speed * 0.5,
+            "MoveRight" => t + time * speed * 0.5,
+            _ => t
+        };
+        float mod = (float)(raw - Math.Floor(raw));
+        return mod < 0.5f ? mod * 2 : (1 - mod) * 2;
+    }
+
+    public void Reset() { }
+
+    public static Color GetThemeColor(string theme, float t, float intensity, Color customColor, List<Color>? gradientColors = null)
     {
         float brightness = 0.5f + intensity * 0.5f;
         byte br(byte v) => (byte)(v * brightness);
         byte brI(byte v) => (byte)(v * (0.5f + intensity * 0.5f));
+
+        if (theme == "Custom" && gradientColors != null && gradientColors.Count >= 2)
+        {
+            float pos = t * (gradientColors.Count - 1);
+            int idx = (int)pos;
+            float frac = pos - idx;
+            if (idx >= gradientColors.Count - 1)
+                return Color.FromRgb(br(gradientColors.Last().R), br(gradientColors.Last().G), br(gradientColors.Last().B));
+            var c1 = gradientColors[idx];
+            var c2 = gradientColors[idx + 1];
+            byte r = (byte)(c1.R + (c2.R - c1.R) * frac);
+            byte g = (byte)(c1.G + (c2.G - c1.G) * frac);
+            byte b = (byte)(c1.B + (c2.B - c1.B) * frac);
+            return Color.FromRgb(br(r), br(g), br(b));
+        }
 
         return theme switch
         {
@@ -72,16 +125,14 @@ public class BarVisualizer : IVisualizerRenderer
 
         switch (seg)
         {
-            case 0: r = 1; g = frac;       b = 0; break;          // red → yellow
-            case 1: r = 1 - frac; g = 1;   b = 0; break;          // yellow → green
-            case 2: r = 0; g = 1;          b = frac; break;       // green → cyan
-            case 3: r = 0; g = 1 - frac;   b = 1; break;          // cyan → blue
-            default: r = frac; g = 0;      b = 1; break;          // blue → violet
+            case 0: r = 1; g = frac;       b = 0; break;
+            case 1: r = 1 - frac; g = 1;   b = 0; break;
+            case 2: r = 0; g = 1;          b = frac; break;
+            case 3: r = 0; g = 1 - frac;   b = 1; break;
+            default: r = frac; g = 0;      b = 1; break;
         }
 
         float brightness = 0.5f + intensity * 0.5f;
         return Color.FromRgb((byte)(r * brightness * 255), (byte)(g * brightness * 255), (byte)(b * brightness * 255));
     }
-
-    public void Reset() { }
 }

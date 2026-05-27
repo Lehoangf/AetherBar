@@ -2,16 +2,25 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Windows.Media.Control;
 using AetherBar.Core.Models;
+using AetherBar.Plugins;
 
 namespace AetherBar.Core.Media;
 
-public class MediaManager : IDisposable
+public class MediaManager : IDisposable, IMediaController
 {
     private bool _disposed;
     private Timer? _pollTimer;
     private GlobalSystemMediaTransportControlsSession? _currentSession;
 
     public event EventHandler<MediaInfo>? MediaInfoChanged;
+
+    MediaPlaybackStatus? IMediaController.CurrentStatus => CurrentMedia.PlaybackStatus;
+    event Action<MediaPlaybackStatus>? IMediaController.StatusChanged
+    {
+        add => _statusChanged += value;
+        remove => _statusChanged -= value;
+    }
+    private Action<MediaPlaybackStatus>? _statusChanged;
 
     public MediaInfo CurrentMedia { get; private set; } = new()
     {
@@ -41,14 +50,20 @@ public class MediaManager : IDisposable
             {
                 if (!AreSameState(CurrentMedia, mediaInfo))
                 {
+                    var oldStatus = CurrentMedia.PlaybackStatus;
                     CurrentMedia = mediaInfo;
+                    if (oldStatus != mediaInfo.PlaybackStatus)
+                        _statusChanged?.Invoke(mediaInfo.PlaybackStatus);
                     MediaInfoChanged?.Invoke(this, mediaInfo);
                 }
             }
             else if (CurrentMedia.PlaybackStatus != MediaPlaybackStatus.Closed)
             {
+                var oldStatus = CurrentMedia.PlaybackStatus;
                 CurrentMedia = CreateClosedMediaInfo();
                 _currentSession = null;
+                if (oldStatus != MediaPlaybackStatus.Closed)
+                    _statusChanged?.Invoke(MediaPlaybackStatus.Closed);
                 MediaInfoChanged?.Invoke(this, CurrentMedia);
             }
         }

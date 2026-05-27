@@ -30,7 +30,9 @@ Real-time FFT audio visualization at 60fps directly in the taskbar using NAudio 
 | **Mirror** | Bars mirrored symmetrically from center outward |
 | **Blocks** | Horizontal segmented blocks stacking vertically per frequency |
 
-**8 Color Themes:** Rainbow, Neon Blue, Matrix Green, Fire, Monochrome, Sunset, Ocean, Cyberpunk + Custom R/G/B sliders. Colors are applied left-to-right across the widget width.
+**9 Color Themes:** Rainbow, Neon Blue, Matrix Green, Fire, Monochrome, Sunset, Ocean, Cyberpunk + Custom (up to 10 colors with individual R/G/B sliders).  
+**Animated Gradient** — smooth color cycling across all themes with 3 direction modes (MoveLeft, MoveRight, Wave), adjustable speed (0.1–5.0), and seamless interpolation. Wave mode uses sin reflection for butter-smooth transitions.  
+**Album Art Color** option — visualizer dynamically matches the dominant color extracted from the current album art (disabled when Animated Gradient is active).
 
 ### 🎚 Audio Pipeline
 - WASAPI loopback capture (all system audio) via NAudio
@@ -77,7 +79,7 @@ Native Win32 embedding via `SetParent` into `Shell_TrayWnd`:
 ### ⚙️ Settings Dashboard
 Fluent Design settings window with 4 tabs. Every change applies live — no Save button needed.
 
-- **Visualizer tab:** Mode, Color Theme, Custom Color (R/G/B sliders), Opacity, Bar Count, Sensitivity, Threshold, Bar Start Offset, Show Peak, Visualizer Height
+- **Visualizer tab:** Mode, Color Theme, Custom Color (up to 10 colors, each with R/G/B sliders), Animated Gradient (direction + speed), Opacity, Bar Count, Sensitivity, Threshold, Bar Start Offset, Show Peak, Visualizer Height
 - **Taskbar tab:** Position, Widget Width, Horizontal Offset, Widget Padding, Show Song Title, Show Album Art, Album Art (Size/Corner Radius/Opacity), Text Color (Auto/White/Black/Red/Green/Blue/Cyan/Yellow/Custom + R/G/B), Auto-hide
 - **Effects tab:** Background Effect (None/Acrylic/Mica), Corner Radius, Adaptive Theme
 - **General tab:** Start with Windows, Start Minimized (tray only), Dark Mode, Game Mode, Check for Updates, Reset to Defaults
@@ -88,11 +90,13 @@ Extensible via collectible `AssemblyLoadContext`:
 - `IPluginContext` provides `TaskbarHwnd` and `CreateWidget()`
 - `PluginManager` loads/unloads assemblies at runtime
 - `IPluginWithSettings` lets plugins expose custom controls in the Settings window
-- `PluginWidget` supports text content, font size, vertical offset, single text color, and separate top/bottom line colors
+- `PluginWidget` supports text content, font size, vertical offset, text color, separate top/bottom line colors, opacity, and SVG icons (via string names → host-created WPF Path/Rectangle on UI thread to avoid cross-thread exceptions)
+- Icon styling: `SetIconColor()`, `SetIconSize()`, `SetIconSpacing()` with immediate re-render
 - Plugin projects can import `AetherBar.Plugins/AetherBar.Plugin.targets` to auto-reference the plugin API and copy outputs to the app `plugins` folder
 - Included sample plugins:
   - `Custom Text`: editable taskbar text with font size, vertical offset, and text color settings
   - `System Monitor (Sample)`: live CPU/RAM widget with separate CPU and RAM color settings
+  - `Media Player`: media playback controls with play/pause/next/previous buttons, playing/idle colors, and icon customization
 - See `PLUGIN_DEVELOPMENT.md` for the plugin project template, lifecycle rules, settings API, and sample plugin patterns.
 
 ### 🖥 System Tray Icon
@@ -229,9 +233,16 @@ Settings are persisted as JSON at `%LOCALAPPDATA%\AetherBar\settings.json`.
 | Sensitivity | 1.0 | 0.1–3.0 |
 | Threshold | 0.0 | 0.0–0.5 |
 | BarStartOffset | 0 | 0–250 |
-| ColorTheme | "Rainbow" | 9 themes |
+| ColorTheme | "Rainbow" | 9 themes + Custom |
+| AnimatedGradient | false | bool |
+| GradientDirection | "MoveRight" | MoveLeft / MoveRight / Wave |
+| GradientSpeed | 1.0 | 0.1–5.0 |
+| CustomGradientColors | [] | List of hex colors (2–10) |
 | Opacity | 0.5 | 0.1–1.0 |
 | ShowPeak | true | bool |
+| AlbumArtColor | false | bool |
+| AlbumArtMinLightness | 0.3 | 0.0–1.0 |
+| AlbumArtMaxLightness | 0.85 | 0.0–1.0 |
 | VisualizerHeight | 22 | 10–48 |
 
 ### Taskbar
@@ -281,6 +292,8 @@ Plugins have shared layout controls in the Settings window:
 | SortOrder | Display order within its panel |
 | Padding | Horizontal offset for the plugin widget |
 | Width | Fixed widget width, or auto when unset |
+| Opacity | Per-plugin transparency (0.0–1.0) |
+| VerticalOffset | Per-plugin vertical position shift |
 
 Plugins may also expose their own settings through `IPluginWithSettings`.
 
@@ -288,6 +301,7 @@ Plugins may also expose their own settings through `IPluginWithSettings`.
 |--------|-----------------|
 | Custom Text | Text Content, Font Size, Vertical Offset, Text Color, Single/Double Click Action & Value, Hover Action, Hover Color, Hover Tooltip |
 | System Monitor (Sample) | CPU Color, RAM Color, Single/Double Click Action & Value, Hover Action, Hover Color, Hover Tooltip |
+| Media Player | Playing Color, Idle Color, Hover Color, Icon Size, Icon Spacing, Hide When Idle |
 
 ---
 

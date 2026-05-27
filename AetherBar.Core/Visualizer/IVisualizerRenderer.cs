@@ -13,6 +13,11 @@ public class RenderOptions
     public bool ShowPeak { get; set; } = true;
     public int BarStartOffset { get; set; } = 0;
     public Color CustomColor { get; set; } = Color.FromRgb(255, 68, 68);
+    public bool AnimatedGradientEnabled { get; set; } = false;
+    public string AnimatedGradientDirection { get; set; } = "MoveRight";
+    public double AnimatedGradientSpeed { get; set; } = 1.0;
+    public double AnimationTime { get; set; } = 0.0;
+    public List<Color> CustomGradientColors { get; set; } = new();
 }
 
 public interface IVisualizerRenderer

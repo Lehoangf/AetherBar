@@ -1,3 +1,5 @@
+using AetherBar.Plugins;
+
 namespace AetherBar.Core.Models;
 
 public class MediaInfo
@@ -9,13 +11,4 @@ public class MediaInfo
     public TimeSpan Position { get; set; }
     public TimeSpan Duration { get; set; }
     public MediaPlaybackStatus PlaybackStatus { get; set; }
-}
-
-public enum MediaPlaybackStatus
-{
-    Closed,
-    Changing,
-    Stopped,
-    Playing,
-    Paused
 }

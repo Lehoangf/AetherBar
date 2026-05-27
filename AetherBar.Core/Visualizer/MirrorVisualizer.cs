@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Media;
 
@@ -10,6 +11,11 @@ public class MirrorVisualizer : IVisualizerRenderer
     public void Render(DrawingContext context, float[] fftData, float peakLevel, Size size, RenderOptions options)
     {
         if (fftData.Length == 0) return;
+
+        var animated = options.AnimatedGradientEnabled;
+        var animTime = options.AnimationTime;
+        var animDir = options.AnimatedGradientDirection;
+        var animSpeed = options.AnimatedGradientSpeed;
 
         int offset = Math.Min(options.BarStartOffset, fftData.Length - 1);
         int effectiveLength = fftData.Length - offset;
@@ -29,7 +35,15 @@ public class MirrorVisualizer : IVisualizerRenderer
             double barHeight = value * maxHeight;
             if (barHeight < 0.5) continue;
 
-            var color = BarVisualizer.GetThemeColor(options.ColorTheme, (float)i / barCount, value, options.CustomColor);
+            float t = (float)i / barCount;
+            float intensity = value;
+
+            if (animated)
+            {
+                t = BarVisualizer.GetAnimatedT(t, animTime, animDir, animSpeed);
+            }
+
+            var color = BarVisualizer.GetThemeColor(options.ColorTheme, t, intensity, options.CustomColor, options.CustomGradientColors);
             var brush = new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B));
             double gap = Math.Max(0.5, barWidth * 0.15);
             double w = Math.Max(1, barWidth - gap);

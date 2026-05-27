@@ -11,11 +11,13 @@ public class AetherBarSettings
 
 public class PluginItemSettings
 {
-    public string Alignment { get; set; } = "Right"; // "Left", "Center", "Right"
+    public string Alignment { get; set; } = "Right";
     public int Padding { get; set; } = 0;
-    public int Width { get; set; } = -1; // -1 means default Auto/NaN
+    public int Width { get; set; } = -1;          // -1 = Auto/NaN
     public bool Enabled { get; set; } = true;
     public int SortOrder { get; set; } = 0;
+    public int VerticalOffset { get; set; } = 0;
+    public double Opacity { get; set; } = 1.0;
     public Dictionary<string, string> CustomSettings { get; set; } = new();
 }
 
@@ -37,6 +39,13 @@ public class ModeSettings
     public int CustomColorR { get; set; } = 255;
     public int CustomColorG { get; set; } = 68;
     public int CustomColorB { get; set; } = 68;
+    public bool AlbumArtColor { get; set; } = false;
+    public double AlbumArtMinLightness { get; set; } = 0.3;
+    public double AlbumArtMaxLightness { get; set; } = 0.85;
+    public bool AnimatedGradientEnabled { get; set; } = false;
+    public string AnimatedGradientDirection { get; set; } = "MoveRight";
+    public double AnimatedGradientSpeed { get; set; } = 1.0;
+    public List<string> CustomGradientColors { get; set; } = new();
 }
 
 public class TaskbarSettings
@@ -61,6 +70,8 @@ public class TaskbarSettings
     public int AlbumArtCornerRadius { get; set; } = 4;
     public double AlbumArtOpacity { get; set; } = 1.0;
     public int VisualizerHeight { get; set; } = 22;
+    public int VisualizerOffsetY { get; set; } = 0;
+    public double TitleOpacity { get; set; } = 1.0;
 }
 
 public class EffectsSettings

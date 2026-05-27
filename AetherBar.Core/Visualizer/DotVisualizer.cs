@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Media;
 
@@ -10,6 +11,11 @@ public class DotVisualizer : IVisualizerRenderer
     public void Render(DrawingContext context, float[] fftData, float peakLevel, Size size, RenderOptions options)
     {
         if (fftData.Length == 0) return;
+
+        var animated = options.AnimatedGradientEnabled;
+        var animTime = options.AnimationTime;
+        var animDir = options.AnimatedGradientDirection;
+        var animSpeed = options.AnimatedGradientSpeed;
 
         int offset = Math.Min(options.BarStartOffset, fftData.Length - 1);
         int effectiveLength = fftData.Length - offset;
@@ -39,7 +45,13 @@ public class DotVisualizer : IVisualizerRenderer
             double cy = y * cellH + cellH / 2;
             double dotR = value * maxR + 0.5;
 
-            var color = BarVisualizer.GetThemeColor(options.ColorTheme, (float)x / cols, value, options.CustomColor);
+            float t = (float)x / cols;
+            float intensity = value;
+
+            if (animated)
+                t = BarVisualizer.GetAnimatedT(t, animTime, animDir, animSpeed);
+
+            var color = BarVisualizer.GetThemeColor(options.ColorTheme, t, intensity, options.CustomColor, options.CustomGradientColors);
 
             // Glow (larger, faint)
             context.DrawEllipse(

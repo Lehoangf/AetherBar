@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Media;
 
@@ -10,6 +11,11 @@ public class LineVisualizer : IVisualizerRenderer
     public void Render(DrawingContext context, float[] fftData, float peakLevel, Size size, RenderOptions options)
     {
         if (fftData.Length < 2) return;
+
+        var animated = options.AnimatedGradientEnabled;
+        var animTime = options.AnimationTime;
+        var animDir = options.AnimatedGradientDirection;
+        var animSpeed = options.AnimatedGradientSpeed;
 
         int offset = Math.Min(options.BarStartOffset, fftData.Length - 1);
         int effectiveLength = fftData.Length - offset;
@@ -49,7 +55,8 @@ public class LineVisualizer : IVisualizerRenderer
         }
         fillGeo.Freeze();
 
-        var midColor = BarVisualizer.GetThemeColor(options.ColorTheme, 0.5f, 0.6f, options.CustomColor);
+        float midT = animated ? BarVisualizer.GetAnimatedT(0.5f, animTime, animDir, animSpeed) : 0.5f;
+        var midColor = BarVisualizer.GetThemeColor(options.ColorTheme, midT, 0.6f, options.CustomColor, options.CustomGradientColors);
         var fillBrush = new SolidColorBrush(Color.FromArgb((byte)(alpha * 0.4), midColor.R, midColor.G, midColor.B));
         context.DrawGeometry(fillBrush, null, fillGeo);
 
@@ -70,7 +77,8 @@ public class LineVisualizer : IVisualizerRenderer
         }
         lineGeo.Freeze();
 
-        var lineColor = BarVisualizer.GetThemeColor(options.ColorTheme, 0.5f, 1, options.CustomColor);
+        float lineT = animated ? BarVisualizer.GetAnimatedT(0.5f, animTime, animDir, animSpeed) : 0.5f;
+        var lineColor = BarVisualizer.GetThemeColor(options.ColorTheme, lineT, 1, options.CustomColor, options.CustomGradientColors);
         var linePen = new Pen(new SolidColorBrush(Color.FromArgb(alpha, lineColor.R, lineColor.G, lineColor.B)), 2);
         context.DrawGeometry(null, linePen, lineGeo);
 
@@ -78,7 +86,15 @@ public class LineVisualizer : IVisualizerRenderer
         for (int i = 0; i < pointCount; i += 3)
         {
             if (values[i] < options.Threshold) continue;
-            var dotColor = BarVisualizer.GetThemeColor(options.ColorTheme, (float)i / pointCount, values[i], options.CustomColor);
+            float t = (float)i / pointCount;
+            float intensity = values[i];
+
+            if (animated)
+            {
+                t = BarVisualizer.GetAnimatedT(t, animTime, animDir, animSpeed);
+            }
+
+            var dotColor = BarVisualizer.GetThemeColor(options.ColorTheme, t, intensity, options.CustomColor, options.CustomGradientColors);
             double dotR = 1.5 + values[i] * 1.5;
             context.DrawEllipse(
                 new SolidColorBrush(Color.FromArgb((byte)(alpha * 0.8), dotColor.R, dotColor.G, dotColor.B)),
