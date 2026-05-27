@@ -9,6 +9,7 @@ public class MediaManager : IDisposable
 {
     private bool _disposed;
     private Timer? _pollTimer;
+    private GlobalSystemMediaTransportControlsSession? _currentSession;
 
     public event EventHandler<MediaInfo>? MediaInfoChanged;
 
@@ -47,6 +48,7 @@ public class MediaManager : IDisposable
             else if (CurrentMedia.PlaybackStatus != MediaPlaybackStatus.Closed)
             {
                 CurrentMedia = CreateClosedMediaInfo();
+                _currentSession = null;
                 MediaInfoChanged?.Invoke(this, CurrentMedia);
             }
         }
@@ -76,10 +78,12 @@ public class MediaManager : IDisposable
     {
         try
         {
-            var smtcManager = Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager.RequestAsync().GetAwaiter().GetResult();
+            var smtcManager = GlobalSystemMediaTransportControlsSessionManager.RequestAsync().GetAwaiter().GetResult();
             var session = smtcManager.GetCurrentSession();
             if (session == null)
                 return null;
+
+            _currentSession = session;
 
             var mediaProps = session.TryGetMediaPropertiesAsync().GetAwaiter().GetResult();
             if (mediaProps == null)
@@ -88,9 +92,9 @@ public class MediaManager : IDisposable
             var playbackInfo = session.GetPlaybackInfo();
             var status = playbackInfo.PlaybackStatus switch
             {
-                Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing => MediaPlaybackStatus.Playing,
-                Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused => MediaPlaybackStatus.Paused,
-                Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus.Stopped => MediaPlaybackStatus.Stopped,
+                GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing => MediaPlaybackStatus.Playing,
+                GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused => MediaPlaybackStatus.Paused,
+                GlobalSystemMediaTransportControlsSessionPlaybackStatus.Stopped => MediaPlaybackStatus.Stopped,
                 _ => MediaPlaybackStatus.Closed
             };
 
@@ -125,6 +129,39 @@ public class MediaManager : IDisposable
         }
     }
 
+    public async Task PlayPauseAsync()
+    {
+        try
+        {
+            if (_currentSession == null) return;
+            if (CurrentMedia.PlaybackStatus == MediaPlaybackStatus.Playing)
+                await _currentSession.TryPauseAsync();
+            else
+                await _currentSession.TryPlayAsync();
+        }
+        catch { }
+    }
+
+    public async Task SkipNextAsync()
+    {
+        try
+        {
+            if (_currentSession != null)
+                await _currentSession.TrySkipNextAsync();
+        }
+        catch { }
+    }
+
+    public async Task SkipPreviousAsync()
+    {
+        try
+        {
+            if (_currentSession != null)
+                await _currentSession.TrySkipPreviousAsync();
+        }
+        catch { }
+    }
+
     public void StopMonitoring()
     {
         _pollTimer?.Dispose();
@@ -135,6 +172,7 @@ public class MediaManager : IDisposable
     {
         if (_disposed) return;
         StopMonitoring();
+        _currentSession = null;
         _disposed = true;
         GC.SuppressFinalize(this);
     }

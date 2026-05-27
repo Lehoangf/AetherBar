@@ -150,11 +150,14 @@ public partial class MainWindow : Window
         {
             var s = _settingsManager.Current;
 
-            if (media.PlaybackStatus == MediaPlaybackStatus.Playing)
+            if (media.PlaybackStatus == MediaPlaybackStatus.Playing ||
+                media.PlaybackStatus == MediaPlaybackStatus.Paused)
             {
                 _mediaActive = true;
                 _currentMedia = media;
                 VisualizerControl.Visibility = Visibility.Visible;
+                MediaButtonsPanel.Visibility = Visibility.Visible;
+                BtnPlayPause.Text = media.PlaybackStatus == MediaPlaybackStatus.Playing ? "⏸" : "▶";
 
                 if (media.AlbumArt != null && media.AlbumArt.Length > 0)
                 {
@@ -204,6 +207,7 @@ public partial class MainWindow : Window
                 _mediaActive = false;
                 _hasAlbumArt = false;
                 _currentMedia = null;
+                MediaButtonsPanel.Visibility = Visibility.Collapsed;
                 ApplyAlbumArtSettings();
                 SongInfoText.Visibility = Visibility.Collapsed;
                 StopMarquee();
@@ -1043,6 +1047,24 @@ public partial class MainWindow : Window
 
     private void OnWidgetPreviewMouseUp(object sender, MouseButtonEventArgs e)
     {
+    }
+
+    private async void OnMediaPrevClick(object sender, MouseButtonEventArgs e)
+    {
+        if (_mediaManager != null)
+            await _mediaManager.SkipPreviousAsync();
+    }
+
+    private async void OnMediaPlayPauseClick(object sender, MouseButtonEventArgs e)
+    {
+        if (_mediaManager != null)
+            await _mediaManager.PlayPauseAsync();
+    }
+
+    private async void OnMediaNextClick(object sender, MouseButtonEventArgs e)
+    {
+        if (_mediaManager != null)
+            await _mediaManager.SkipNextAsync();
     }
 
     private static void HandleWidgetAction(string action, string value)
