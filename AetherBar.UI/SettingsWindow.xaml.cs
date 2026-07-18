@@ -182,9 +182,9 @@ public partial class SettingsWindow : Window
         BgBSlider.Value = s.Effects.BackgroundColorB;
         BgOpacitySlider.Value = s.Effects.BackgroundOpacity;
         UpdateBgColorPanel();
-        UpdateBgColorPreview();
         CornerRadiusSlider.Value = s.Effects.CornerRadius;
         AdaptiveThemeCheck.IsChecked = s.Effects.AdaptiveTheme;
+        UpdateBgColorPreview();
         DarkModeCheck.IsChecked = s.Effects.EnableDarkMode;
 
         StartWithWindowsCheck.IsChecked = s.General.StartWithWindows;
@@ -400,6 +400,24 @@ public partial class SettingsWindow : Window
 
     private void UpdateBgColorPreview()
     {
+        bool adaptive = AdaptiveThemeCheck.IsChecked == true;
+
+        BgColorCombo.IsEnabled = !adaptive;
+        BgRSlider.IsEnabled = !adaptive;
+        BgGSlider.IsEnabled = !adaptive;
+        BgBSlider.IsEnabled = !adaptive;
+
+        if (adaptive)
+        {
+            var albumColor = MainWindow.CurrentAlbumArtColor;
+            if (albumColor != default && albumColor != Colors.Transparent)
+            {
+                BgColorPreview.Background = new SolidColorBrush(albumColor);
+                BgOpacityValue.Text = BgOpacitySlider.Value.ToString("0.00");
+                return;
+            }
+        }
+
         var mode = GetSelected(BgColorCombo);
         var r = (byte)BgRSlider.Value;
         var g = (byte)BgGSlider.Value;

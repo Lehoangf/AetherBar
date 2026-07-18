@@ -469,14 +469,25 @@ public partial class MainWindow : Window
         var s = _settingsManager.Current;
         var currentMedia = media ?? _currentMedia;
 
-        if (_mediaActive && currentMedia?.PlaybackStatus == MediaPlaybackStatus.Playing
-            && currentMedia.AlbumArt != null && currentMedia.AlbumArt.Length > 0
-            && s.Effects.AdaptiveTheme)
+        if (s.Effects.AdaptiveTheme)
         {
-            var color = DominantColorExtractor.ExtractFromBytes(currentMedia.AlbumArt);
-            WidgetContainer.Background = new SolidColorBrush(
-                Color.FromArgb((byte)(s.Effects.BackgroundOpacity * 255), color.R, color.G, color.B));
-            return;
+            var color = _albumArtColor;
+            if (color != Colors.Transparent)
+            {
+                WidgetContainer.Background = new SolidColorBrush(
+                    Color.FromArgb((byte)(s.Effects.BackgroundOpacity * 255), color.R, color.G, color.B));
+                return;
+            }
+
+            if (_mediaActive && currentMedia?.AlbumArt != null && currentMedia.AlbumArt.Length > 0)
+            {
+                color = DominantColorExtractor.ExtractFromBytes(currentMedia.AlbumArt);
+                _albumArtColor = color;
+                CurrentAlbumArtColor = color;
+                WidgetContainer.Background = new SolidColorBrush(
+                    Color.FromArgb((byte)(s.Effects.BackgroundOpacity * 255), color.R, color.G, color.B));
+                return;
+            }
         }
 
         var bgColor = s.Effects.BackgroundColor;
