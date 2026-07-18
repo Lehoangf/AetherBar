@@ -70,10 +70,8 @@ Native Win32 embedding via `SetParent` into `Shell_TrayWnd`:
 ### 🎨 Visual Effects
 | Effect | Support |
 |--------|---------|
-| **Acrylic (Blur)** | Windows 11 via `SetWindowCompositionAttribute` |
-| **Mica** | Windows 11+ via `DwmSetWindowAttribute` |
 | **Immersive Dark Mode** | Title bar + widget background |
-| **Corner Radius** | Configurable 0–12 px |
+| **Corner Radius** | Configurable 0–12 px (fixed — now properly applies to album art avatar) |
 | **Widget Padding** | Configurable 0–20 px |
 
 ### ⚙️ Settings Dashboard
@@ -81,8 +79,8 @@ Fluent Design settings window with 4 tabs. Every change applies live — no Save
 
 - **Visualizer tab:** Mode, Color Theme, Custom Color (up to 10 colors, each with R/G/B sliders), Animated Gradient (direction + speed), Opacity, Bar Count, Sensitivity, Threshold, Bar Start Offset, Show Peak, Visualizer Height
 - **Taskbar tab:** Position, Widget Width, Horizontal Offset, Widget Padding, Show Song Title, Show Album Art, Album Art (Size/Corner Radius/Opacity), Text Color (Auto/White/Black/Red/Green/Blue/Cyan/Yellow/Custom + R/G/B), Auto-hide
-- **Effects tab:** Background Effect (None/Acrylic/Mica), Corner Radius, Adaptive Theme
-- **General tab:** Start with Windows, Start Minimized (tray only), Dark Mode, Game Mode, Check for Updates, Reset to Defaults
+- **Effects tab:** Corner Radius, Adaptive Theme
+- **General tab:** Start with Windows (via Task Scheduler — works with admin elevation), Start Minimized (tray only), Dark Mode, Reset to Defaults
 
 ### 🔌 Plugin System
 Extensible via collectible `AssemblyLoadContext`:
@@ -101,9 +99,6 @@ Extensible via collectible `AssemblyLoadContext`:
 
 ### 🖥 System Tray Icon
 H.NotifyIcon.Wpf `TaskbarIcon` with context menu (Show/Hide, Settings, Exit). Icon loaded from multi-resolution `.ico` (16×16 – 256×256).
-
-### 🎮 Game Mode
-Detects fullscreen foreground windows (games) via polling `GetForegroundWindow` — auto-hides the widget.
 
 ### 🎨 Theme System
 - **Dark/Light mode** via WPF-UI `ApplicationThemeManager.Apply()`
@@ -127,7 +122,6 @@ AetherBar.slnx
 │   ├── Interop/           — NativeMethods, DesktopWindowManager (DWM)
 │   ├── TaskbarHooker.cs   — Find Shell_TrayWnd, SetParent, positioning
 │   ├── TaskbarWatcher.cs  — WH_SHELL hook for layout changes
-│   └── GameModeDetector.cs— Fullscreen app detection
 ├── AetherBar.UI           — WPF application (WinExe)
 │   ├── MainWindow.xaml    — Widget window (tray icon, visualizer, album art)
 │   ├── SettingsWindow.xaml— 4-tab settings dialog (Fluent Design)
@@ -267,7 +261,6 @@ Settings are persisted as JSON at `%LOCALAPPDATA%\AetherBar\settings.json`.
 
 | Setting | Default | Options |
 |---------|---------|---------|
-| BackgroundEffect | "Transparent" | None/Acrylic (Blur)/Mica |
 | CornerRadius | 4 | 0–12 |
 | AdaptiveTheme | true | bool |
 | EnableDarkMode | true | bool |
@@ -276,10 +269,8 @@ Settings are persisted as JSON at `%LOCALAPPDATA%\AetherBar\settings.json`.
 
 | Setting | Default |
 |---------|---------|
-| StartWithWindows | false |
+| StartWithWindows | false (via Task Scheduler) |
 | StartMinimized | true |
-| EnableGameMode | true |
-| CheckForUpdates | true |
 
 ### Plugins
 
@@ -312,7 +303,7 @@ Plugins may also expose their own settings through `IPluginWithSettings`.
 | 1 — Taskbar hooking, Win32 interop, dynamic spacing | ✅ |
 | 2 — Audio capture (FFT), media metadata, dominant color | ✅ |
 | 3 — Visualizer rendering (Bar/Line/Dot/Circle), tray icon | ✅ |
-| 4 — Settings dashboard, Acrylic/Mica, dark/light theme | ✅ |
+| 4 — Settings dashboard, Acrylic/Mica/Game Mode removed, dark/light theme | ✅ |
 | 5 — Plugin marketplace, scripting support | 🔜 |
 
 ---

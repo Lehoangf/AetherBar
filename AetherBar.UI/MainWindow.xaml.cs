@@ -29,7 +29,6 @@ public partial class MainWindow : Window
     private VisualizerController? _visualizer;
     private MediaManager? _mediaManager;
     private DispatcherTimer? _positionTimer;
-    private GameModeDetector? _gameMode;
     private SettingsManager _settingsManager = null!;
     private bool _embedded;
     private AetherBar.Plugins.PluginManager? _pluginManager;
@@ -91,9 +90,6 @@ public partial class MainWindow : Window
         _visualizer = new VisualizerController(_audioManager);
         VisualizerControl.SetController(_visualizer);
 
-        _gameMode = new GameModeDetector();
-        _gameMode.FullscreenStateChanged += OnFullscreenStateChanged;
-
         _settingsManager.SettingsChanged -= OnSettingsChanged;
         _settingsManager.SettingsChanged += OnSettingsChanged;
 
@@ -143,10 +139,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnFullscreenStateChanged(object? sender, bool isFullscreen)
-    {
-    }
-
     private void OnMediaInfoChanged(object? sender, MediaInfo media)
     {
         Dispatcher.Invoke(() =>
@@ -163,25 +155,18 @@ public partial class MainWindow : Window
                 if (media.AlbumArt != null && media.AlbumArt.Length > 0)
                 {
                     _hasAlbumArt = true;
-                    using var ms = new MemoryStream(media.AlbumArt);
                     var bmp = new BitmapImage();
                     bmp.BeginInit();
                     bmp.CacheOption = BitmapCacheOption.OnLoad;
-                    bmp.StreamSource = ms;
+                    bmp.StreamSource = new MemoryStream(media.AlbumArt);
                     bmp.EndInit();
+                    bmp.Freeze();
                     AlbumArtImage.Source = bmp;
                     ApplyAlbumArtSettings();
 
                     var color = DominantColorExtractor.ExtractFromBytes(media.AlbumArt);
                     _albumArtColor = color;
                     CurrentAlbumArtColor = color;
-
-                    if (s.Effects.AdaptiveTheme &&
-                        s.Effects.BackgroundEffect != "None")
-                    {
-                        WidgetContainer.Background = new SolidColorBrush(
-                            Color.FromArgb(40, color.R, color.G, color.B));
-                    }
 
                     ApplyAlbumArtColorToVisualizer();
                 }
@@ -246,6 +231,7 @@ public partial class MainWindow : Window
             ApplyAlbumArtSettings();
 
             VisualizerControl.Height = s.Taskbar.VisualizerHeight;
+            VisualizerRow.Height = s.Taskbar.VisualizerHeight;
             VisualizerOffsetTransform.Y = s.Taskbar.VisualizerOffsetY;
             TitleClip.Opacity = s.Taskbar.TitleOpacity;
             Dispatcher.BeginInvoke(UpdateWindowHeight, DispatcherPriority.Background);
@@ -459,18 +445,6 @@ public partial class MainWindow : Window
             if (_embedded)
             {
                 var hwnd = new WindowInteropHelper(this).Handle;
-                switch (s.Effects.BackgroundEffect)
-                {
-                    case "None":
-                        DesktopWindowManager.DisableBackdrop(hwnd);
-                        break;
-                    case "Acrylic (Blur)":
-                        DesktopWindowManager.EnableAcrylic(hwnd);
-                        break;
-                    case "Mica":
-                        DesktopWindowManager.EnableMica(hwnd);
-                        break;
-                }
                 DesktopWindowManager.EnableDarkMode(hwnd, isDark);
             }
         }
@@ -495,29 +469,29 @@ public partial class MainWindow : Window
         var s = _settingsManager.Current;
         var currentMedia = media ?? _currentMedia;
 
-        if (s.Effects.BackgroundEffect == "None")
+        if (_mediaActive && currentMedia?.PlaybackStatus == MediaPlaybackStatus.Playing
+            && currentMedia.AlbumArt != null && currentMedia.AlbumArt.Length > 0
+            && s.Effects.AdaptiveTheme)
         {
-            WidgetContainer.Background = Brushes.Transparent;
+            var color = DominantColorExtractor.ExtractFromBytes(currentMedia.AlbumArt);
+            WidgetContainer.Background = new SolidColorBrush(
+                Color.FromArgb((byte)(s.Effects.BackgroundOpacity * 255), color.R, color.G, color.B));
             return;
         }
 
-        if (_mediaActive && currentMedia?.PlaybackStatus == MediaPlaybackStatus.Playing)
+        var bgColor = s.Effects.BackgroundColor;
+        var opacity = (byte)(s.Effects.BackgroundOpacity * 255);
+        (byte r, byte g, byte b) = bgColor switch
         {
-            if (currentMedia.AlbumArt != null && currentMedia.AlbumArt.Length > 0 && s.Effects.AdaptiveTheme)
-            {
-                var color = DominantColorExtractor.ExtractFromBytes(currentMedia.AlbumArt);
-                WidgetContainer.Background = new SolidColorBrush(
-                    Color.FromArgb(40, color.R, color.G, color.B));
-                return;
-            }
-
-            WidgetContainer.Background = Brushes.Transparent;
-            return;
-        }
-
-        WidgetContainer.Background = s.Effects.EnableDarkMode
-            ? new SolidColorBrush(Color.FromArgb(34, 0, 0, 0))
-            : new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+            "White"       => ((byte)0xFF, (byte)0xFF, (byte)0xFF),
+            "Black"       => ((byte)0x00, (byte)0x00, (byte)0x00),
+            "Red"         => ((byte)0xFF, (byte)0x44, (byte)0x44),
+            "Green"       => ((byte)0x44, (byte)0xFF, (byte)0x44),
+            "Blue"        => ((byte)0x44, (byte)0x44, (byte)0xFF),
+            "Custom"      => ((byte)s.Effects.BackgroundColorR, (byte)s.Effects.BackgroundColorG, (byte)s.Effects.BackgroundColorB),
+            _ => s.Effects.EnableDarkMode ? ((byte)0x00, (byte)0x00, (byte)0x00) : ((byte)0xFF, (byte)0xFF, (byte)0xFF)
+        };
+        WidgetContainer.Background = new SolidColorBrush(Color.FromArgb(opacity, r, g, b));
     }
 
     private void ApplyAlbumArtColorToVisualizer()
@@ -545,11 +519,14 @@ public partial class MainWindow : Window
         AlbumArtBorder.Width = s.Taskbar.AlbumArtSize;
         AlbumArtBorder.Height = s.Taskbar.AlbumArtSize;
         AlbumArtBorder.CornerRadius = new CornerRadius(s.Taskbar.AlbumArtCornerRadius);
+        double size = s.Taskbar.AlbumArtSize;
+        AlbumArtBorder.Clip = new RectangleGeometry(new Rect(0, 0, size, size),
+            s.Taskbar.AlbumArtCornerRadius, s.Taskbar.AlbumArtCornerRadius);
         AlbumArtBorder.Opacity = s.Taskbar.AlbumArtOpacity;
         AlbumArtBorder.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
 
-        AlbumArtImage.Width = s.Taskbar.AlbumArtSize;
-        AlbumArtImage.Height = s.Taskbar.AlbumArtSize;
+        AlbumArtImage.Width = size;
+        AlbumArtImage.Height = size;
         AlbumArtImage.Visibility = Visibility.Visible;
     }
 
@@ -1125,8 +1102,6 @@ public partial class MainWindow : Window
         _positionTimer?.Stop();
         if (_settingsManager != null)
             _settingsManager.SettingsChanged -= OnSettingsChanged;
-        _gameMode?.StopMonitoring();
-        _gameMode?.Dispose();
         VisualizerControl.Cleanup();
         _visualizer?.Dispose();
         _mediaManager?.Dispose();

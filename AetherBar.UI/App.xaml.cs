@@ -108,14 +108,37 @@ public partial class App : Application
 
     public static void SetStartWithWindows(bool enable)
     {
-        const string keyName = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-        const string valueName = "AetherBar";
-        using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(keyName, writable: true);
-        if (key is null) return;
-        if (enable)
-            key.SetValue(valueName, Environment.ProcessPath ?? "");
-        else
-            key.DeleteValue(valueName, throwOnMissingValue: false);
+        var exePath = Environment.ProcessPath ?? "";
+        var taskName = "AetherBar";
+
+        try
+        {
+            if (enable)
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "schtasks",
+                    Arguments = $@"/create /tn ""{taskName}"" /tr ""'{exePath}'"" /sc onlogon /rl highest /f",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                System.Diagnostics.Process.Start(psi)?.WaitForExit(5000);
+            }
+            else
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "schtasks",
+                    Arguments = $@"/delete /tn ""{taskName}"" /f",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                System.Diagnostics.Process.Start(psi)?.WaitForExit(5000);
+            }
+        }
+        catch
+        {
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

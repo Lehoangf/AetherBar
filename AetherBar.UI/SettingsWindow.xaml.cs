@@ -53,7 +53,7 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         _allCombos = new[] { VisualizerModeCombo, ColorThemeCombo, AnimatedDirectionCombo,
             PositionCombo, WidgetTextColorCombo, DoubleClickActionCombo, RightClickActionCombo,
-            BgEffectCombo, PluginSelectorCombo, PluginAlignmentCombo };
+            BgColorCombo, PluginSelectorCombo, PluginAlignmentCombo };
         Closing += (_, _) => _previewTimer?.Stop();
         PreviewMouseWheel += (_, _) =>
         {
@@ -117,7 +117,7 @@ public partial class SettingsWindow : Window
         VisualizerModeCombo.SelectionChanged += OnVisualizerModeChanged;
         PopulateCombo(ColorThemeCombo, "Rainbow", "Neon Blue", "Matrix Green", "Fire", "Monochrome", "Sunset", "Ocean", "Cyberpunk", "Custom");
         PopulateCombo(PositionCombo, "Left", "Center", "Right", "Auto");
-        PopulateCombo(BgEffectCombo, "None", "Acrylic (Blur)", "Mica");
+        PopulateCombo(BgColorCombo, "Default", "Custom", "White", "Black", "Red", "Green", "Blue");
         PopulateCombo(WidgetTextColorCombo, "Auto", "White", "Black", "Red", "Green", "Blue", "Cyan", "Yellow", "Custom");
         PopulateCombo(DoubleClickActionCombo, "nothing", "settings", "url", "run");
         PopulateCombo(RightClickActionCombo, "menu", "nothing");
@@ -176,15 +176,20 @@ public partial class SettingsWindow : Window
         UpdateDoubleClickValueVisibility();
         SelectItem(RightClickActionCombo, s.Taskbar.RightClickAction);
 
-        SelectItem(BgEffectCombo, s.Effects.BackgroundEffect);
+        SelectItem(BgColorCombo, s.Effects.BackgroundColor);
+        BgRSlider.Value = s.Effects.BackgroundColorR;
+        BgGSlider.Value = s.Effects.BackgroundColorG;
+        BgBSlider.Value = s.Effects.BackgroundColorB;
+        BgOpacitySlider.Value = s.Effects.BackgroundOpacity;
+        UpdateBgColorPanel();
+        UpdateBgColorPreview();
         CornerRadiusSlider.Value = s.Effects.CornerRadius;
         AdaptiveThemeCheck.IsChecked = s.Effects.AdaptiveTheme;
         DarkModeCheck.IsChecked = s.Effects.EnableDarkMode;
 
         StartWithWindowsCheck.IsChecked = s.General.StartWithWindows;
         StartMinimizedCheck.IsChecked = s.General.StartMinimized;
-        GameModeCheck.IsChecked = s.General.EnableGameMode;
-        UpdateCheck.IsChecked = s.General.CheckForUpdates;
+
 
         PopulateCombo(PluginAlignmentCombo, "Left", "Center", "Right");
         PopulatePluginsList();
@@ -317,7 +322,13 @@ public partial class SettingsWindow : Window
             UpdateWidgetTextColorPanel();
             UpdateWidgetTextPreview();
 
-            s.Effects.BackgroundEffect = GetSelected(BgEffectCombo);
+            s.Effects.BackgroundColor = GetSelected(BgColorCombo);
+            s.Effects.BackgroundColorR = (int)BgRSlider.Value;
+            s.Effects.BackgroundColorG = (int)BgGSlider.Value;
+            s.Effects.BackgroundColorB = (int)BgBSlider.Value;
+            s.Effects.BackgroundOpacity = BgOpacitySlider.Value;
+            UpdateBgColorPanel();
+            UpdateBgColorPreview();
             s.Effects.CornerRadius = (int)CornerRadiusSlider.Value;
             s.Effects.AdaptiveTheme = AdaptiveThemeCheck.IsChecked ?? true;
             s.Effects.EnableDarkMode = DarkModeCheck.IsChecked ?? true;
@@ -335,8 +346,6 @@ public partial class SettingsWindow : Window
 
             s.General.StartWithWindows = StartWithWindowsCheck.IsChecked ?? false;
             s.General.StartMinimized = StartMinimizedCheck.IsChecked ?? true;
-            s.General.EnableGameMode = GameModeCheck.IsChecked ?? true;
-            s.General.CheckForUpdates = UpdateCheck.IsChecked ?? true;
 
             return s;
         });
@@ -378,6 +387,35 @@ public partial class SettingsWindow : Window
             _ => ((byte)0xBB, (byte)0xBB, (byte)0xBB),
         };
         WidgetTextColorPreview.Background = new SolidColorBrush(Color.FromRgb(pr, pg, pb));
+    }
+
+    private void UpdateBgColorPanel()
+    {
+        BgColorPanel.Visibility = GetSelected(BgColorCombo) == "Custom"
+            ? Visibility.Visible : Visibility.Collapsed;
+        BgRText.Text = ((int)BgRSlider.Value).ToString();
+        BgGText.Text = ((int)BgGSlider.Value).ToString();
+        BgBText.Text = ((int)BgBSlider.Value).ToString();
+    }
+
+    private void UpdateBgColorPreview()
+    {
+        var mode = GetSelected(BgColorCombo);
+        var r = (byte)BgRSlider.Value;
+        var g = (byte)BgGSlider.Value;
+        var b = (byte)BgBSlider.Value;
+        var (pr, pg, pb) = mode switch
+        {
+            "White"       => ((byte)0xFF, (byte)0xFF, (byte)0xFF),
+            "Black"       => ((byte)0x00, (byte)0x00, (byte)0x00),
+            "Red"         => ((byte)0xFF, (byte)0x44, (byte)0x44),
+            "Green"       => ((byte)0x44, (byte)0xFF, (byte)0x44),
+            "Blue"        => ((byte)0x44, (byte)0x44, (byte)0xFF),
+            "Custom"      => (r, g, b),
+            _             => ((byte)0x28, (byte)0x28, (byte)0x28),
+        };
+        BgColorPreview.Background = new SolidColorBrush(Color.FromRgb(pr, pg, pb));
+        BgOpacityValue.Text = BgOpacitySlider.Value.ToString("0.00");
     }
 
     private void UpdateDoubleClickValueVisibility()

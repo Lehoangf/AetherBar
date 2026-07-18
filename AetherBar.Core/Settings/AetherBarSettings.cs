@@ -76,7 +76,12 @@ public class TaskbarSettings
 
 public class EffectsSettings
 {
-    public string BackgroundEffect { get; set; } = "Transparent";
+    public string BackgroundEffect { get; set; } = "None";
+    public string BackgroundColor { get; set; } = "Default";
+    public int BackgroundColorR { get; set; } = 40;
+    public int BackgroundColorG { get; set; } = 40;
+    public int BackgroundColorB { get; set; } = 40;
+    public double BackgroundOpacity { get; set; } = 0.15;
     public bool AdaptiveTheme { get; set; } = true;
     public int CornerRadius { get; set; } = 4;
     public bool EnableDarkMode { get; set; } = true;
@@ -84,9 +89,7 @@ public class EffectsSettings
 
 public class GeneralSettings
 {
-    public bool StartWithWindows { get; set; } = false;
+    public bool StartWithWindows { get; set; } = true;
     public bool StartMinimized { get; set; } = true;
-    public bool EnableGameMode { get; set; } = true;
-    public bool CheckForUpdates { get; set; } = true;
     public string Language { get; set; } = "en";
 }

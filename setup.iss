@@ -8,7 +8,7 @@
 ;   2. iscc setup.iss
 
 #define MyAppName "AetherBar"
-#define MyAppVersion "0.2.5"
+#define MyAppVersion "0.2.6"
 #define MyAppPublisher "AetherBar"
 #define MyAppURL "https://github.com/Lehoangf/AetherBar"
 #define MyAppExeName "AetherBar.UI.exe"
@@ -45,7 +45,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"
-Name: "startup"; Description: "&Start with Windows automatically"; GroupDescription: "Startup options:"
+Name: "startup"; Description: "&Start with Windows automatically (uses Task Scheduler)"; GroupDescription: "Startup options:"
 
 [Files]
 Source: "publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
@@ -58,12 +58,13 @@ Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
+Filename: "schtasks"; Parameters: "/create /tn ""AetherBar"" /tr ""'{app}\{#MyAppExeName}'"" /sc onlogon /rl highest /f"; Flags: runhidden; Tasks: startup; Description: "Create startup task"
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch AetherBar"; Flags: postinstall nowait skipifsilent shellexec
 
-[Registry]
-; Add startup entry if task selected
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "AetherBar"; ValueData: "{app}\{#MyAppExeName}"; Tasks: startup; Flags: uninsdeletevalue
+[UninstallRun]
+Filename: "schtasks"; Parameters: "/delete /tn ""AetherBar"" /f"; Flags: runhidden
 
+[Registry]
 ; App must be closed manually before uninstalling to allow clean file removal
 
 [Code]

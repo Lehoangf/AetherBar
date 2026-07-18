@@ -571,11 +571,84 @@
                             <Border Style="{StaticResource FluentCard}">
                                 <StackPanel>
                                     <TextBlock Text="BACKGROUND" Style="{StaticResource CardTitle}"/>
-                                    <TextBlock Text="EFFECT" Style="{StaticResource SectionHeader}"/>
-                                    <ComboBox x:Name="BgEffectCombo"
+                                    <TextBlock Text="COLOR" Style="{StaticResource SectionHeader}"/>
+                                    <ComboBox x:Name="BgColorCombo"
                                               
                                               SelectedIndex="0"
                                               SelectionChanged="OnSettingChanged"/>
+                                    <Border x:Name="BgColorPanel" Visibility="Collapsed"
+                                            Background="{DynamicResource CustomColorPanelBg}" CornerRadius="6"
+                                            BorderThickness="1" BorderBrush="{DynamicResource CardBorder}"
+                                            Padding="10" Margin="0,8,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="CUSTOM COLOR" Style="{StaticResource SectionHeader}" Margin="0,0,0,6"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="6"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="6"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid Grid.Column="0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="R" Foreground="#FF4444" Width="14" VerticalAlignment="Center" FontSize="12"/>
+                                                    <Slider Grid.Column="1" x:Name="BgRSlider"
+                                                            
+                                                            Minimum="0" Maximum="255" TickFrequency="1"
+                                                            ValueChanged="OnSettingChanged"/>
+                                                    <TextBlock Grid.Column="2" x:Name="BgRText" Text="40" Style="{StaticResource SliderValue}" Width="26"/>
+                                                </Grid>
+                                                <Grid Grid.Column="2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="G" Foreground="#44FF44" Width="14" VerticalAlignment="Center" FontSize="12"/>
+                                                    <Slider Grid.Column="1" x:Name="BgGSlider"
+                                                            
+                                                            Minimum="0" Maximum="255" TickFrequency="1"
+                                                            ValueChanged="OnSettingChanged"/>
+                                                    <TextBlock Grid.Column="2" x:Name="BgGText" Text="40" Style="{StaticResource SliderValue}" Width="26"/>
+                                                </Grid>
+                                                <Grid Grid.Column="4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="B" Foreground="#4444FF" Width="14" VerticalAlignment="Center" FontSize="12"/>
+                                                    <Slider Grid.Column="1" x:Name="BgBSlider"
+                                                            
+                                                            Minimum="0" Maximum="255" TickFrequency="1"
+                                                            ValueChanged="OnSettingChanged"/>
+                                                    <TextBlock Grid.Column="2" x:Name="BgBText" Text="40" Style="{StaticResource SliderValue}" Width="26"/>
+                                                </Grid>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border x:Name="BgColorPreview"
+                                            Height="36" CornerRadius="6"
+                                            Background="#282828"
+                                            BorderThickness="1" BorderBrush="{DynamicResource CardBorder}"
+                                            Margin="0,12,0,0"/>
+                                    <TextBlock Text="OPACITY" Style="{StaticResource SectionHeader}" Margin="0,12,0,0"/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Slider x:Name="BgOpacitySlider"
+                                                Grid.Column="0"
+                                                Minimum="0.0" Maximum="1.0" TickFrequency="0.05"
+                                                ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="BgOpacityValue" Text="0.15" Style="{StaticResource SliderValue}" Grid.Column="1" Width="36"/>
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 
@@ -826,16 +899,6 @@
                                               Content="Dark Mode (White Mode)"
                                               
                                               Margin="0,0,0,4"
-                                              Checked="OnSettingChanged"
-                                              Unchecked="OnSettingChanged"/>
-                                    <CheckBox x:Name="GameModeCheck"
-                                              Content="Game Mode (auto-hide on fullscreen)"
-                                              
-                                              Checked="OnSettingChanged"
-                                              Unchecked="OnSettingChanged"/>
-                                    <CheckBox x:Name="UpdateCheck"
-                                              Content="Check for updates"
-                                              
                                               Checked="OnSettingChanged"
                                               Unchecked="OnSettingChanged"/>
                                 </StackPanel>
