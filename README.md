@@ -88,14 +88,76 @@ Extensible via collectible `AssemblyLoadContext`:
 - `IPluginContext` provides `TaskbarHwnd` and `CreateWidget()`
 - `PluginManager` loads/unloads assemblies at runtime
 - `IPluginWithSettings` lets plugins expose custom controls in the Settings window
-- `PluginWidget` supports text content, font size, vertical offset, text color, separate top/bottom line colors, opacity, and SVG icons (via string names → host-created WPF Path/Rectangle on UI thread to avoid cross-thread exceptions)
+- `PluginWidget` supports text content, font size, vertical offset, text color, separate top/bottom line colors, opacity, text wrapping, max width, text alignment, and SVG icons (via string names → host-created WPF Path/Rectangle on UI thread to avoid cross-thread exceptions)
 - Icon styling: `SetIconColor()`, `SetIconSize()`, `SetIconSpacing()` with immediate re-render
 - Plugin projects can import `AetherBar.Plugins/AetherBar.Plugin.targets` to auto-reference the plugin API and copy outputs to the app `plugins` folder
-- Included sample plugins:
+- Included plugins:
   - `Custom Text`: editable taskbar text with font size, vertical offset, and text color settings
   - `System Monitor (Sample)`: live CPU/RAM widget with separate CPU and RAM color settings
   - `Media Player`: media playback controls with play/pause/next/previous buttons, playing/idle colors, and icon customization
+  - **`Lyrics`**: real-time synced lyrics display from LRCLIB with optional Spicetify WebSocket support for sub-second position accuracy
 - See `PLUGIN_DEVELOPMENT.md` for the plugin project template, lifecycle rules, settings API, and sample plugin patterns.
+
+### 🎤 Lyrics Plugin
+Displays synced lyrics for the currently playing song, line by line, with real-time position tracking.
+
+**How it works:**
+- Fetches synced lyrics (LRC format) from the free [LRCLIB](https://lrclib.net/) API by title + artist
+- Falls back to unsynced (plain) lyrics when synced version is unavailable
+- Shows "♪ Instrumental ♪" for instrumental sections
+- Current line highlighted in gold (`#FFD700`), other lines in white
+- Caches lyrics per track (max 20 entries)
+
+**Settings:**
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Font Size | 10 | Text size (8–20) |
+| Text Color | #FFFFFF | Default text color |
+| Synced Line Color | #FFD700 | Color for current playing line |
+| Offset (ms) | 0 | Timing offset (+ earlier, − later) |
+| Text Alignment | center | left / center / right when text wraps |
+
+**Position source:**
+By default, position is read from Windows SMTC (System Media Transport Controls) which works with any audio source (Spotify, YouTube, Chrome, etc.) but has ~200–500ms latency. For sub-second accuracy with Spotify, install the Spicetify WebSocket extension (see below).
+
+#### Spicetify WebSocket Setup (optional, Spotify only)
+
+The Lyrics plugin includes a built-in WebSocket server that connects to a Spicetify extension for real-time Spotify playback position (< 100ms latency).
+
+**1. Install Spicetify**
+
+If you haven't already, install Spicetify via PowerShell:
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/spicetify/cli/master/install.ps1 | iex
+spicetify apply
+```
+
+**2. Install the WebSocket extension**
+
+Download [`spicetify-websocket-client.js`](https://github.com/19EB/spicetify-websocket-client) and place it in:
+
+```
+%APPDATA%\spicetify\Extensions\spicetify-websocket-client.js
+```
+
+Then copy it to the Spotify apps extensions folder and apply:
+
+```powershell
+Copy-Item "$env:APPDATA\spicetify\Extensions\spicetify-websocket-client.js" "$env:APPDATA\Spotify\Apps\xpui\extensions\" -Force
+spicetify apply
+```
+
+**3. Restart Spotify**
+
+The extension connects as a WebSocket client to `ws://127.0.0.1:9090`. AetherBar's Lyrics plugin hosts the server — no extra software needed.
+
+**How it works:**
+- On startup, the Lyrics plugin starts a WebSocket server on port `9090`
+- The Spicetify extension connects to it automatically when Spotify launches
+- Spotify track changes and position updates are pushed in real time
+- When Spicetify is connected, lyrics sync uses its position; otherwise falls back to SMTC
+- If you switch away from Spotify (e.g. to YouTube), lyrics automatically switch to SMTC data
 
 ### 🖥 System Tray Icon
 H.NotifyIcon.Wpf `TaskbarIcon` with context menu (Show/Hide, Settings, Exit). Icon loaded from multi-resolution `.ico` (16×16 – 256×256).
@@ -133,6 +195,8 @@ AetherBar.slnx
 │                           — Sample configurable text plugin
 ├── AetherBar.Plugins.SampleSystemMonitor
 │                           — Sample CPU/RAM plugin
+├── AetherBar.Plugins.Lyrics
+│                           — Synced lyrics plugin (LRCLIB + Spicetify WebSocket)
 ├── PLUGIN_DEVELOPMENT.md   — Plugin authoring guide
 └── AetherBar.Tests         — xUnit unit tests (6 tests)
 ```
@@ -150,11 +214,15 @@ System Audio → NAudio WASAPI → FFT (1024, Hann, log bins)
                                     ↓
                               DrawingContext (WPF, 60fps)
 
-WinRT Media Session → MediaManager (1s poll) → MainWindow UI update
-                                                      ↓
-                                              DominantColorExtractor
-                                                      ↓
-                                              Adaptive background tint
+WinRT Media Session → MediaManager (100ms poll) → MainWindow UI update
+                                                       ↓
+                                               DominantColorExtractor
+                                                       ↓
+                                               Adaptive background tint
+
+LRCLIB API → LyricsPlugin → Synced LRC lines → 100ms sync timer → Taskbar text
+         ↕                                                      ↕
+Spicetify WebSocket (port 9090) ←→ Real-time position ←→ Line highlight
 
 Taskbar Layout → WH_SHELL hook → TaskbarHooker.RefreshTaskbarInfo()
                                           ↓
@@ -293,6 +361,7 @@ Plugins may also expose their own settings through `IPluginWithSettings`.
 | Custom Text | Text Content, Font Size, Vertical Offset, Text Color, Single/Double Click Action & Value, Hover Action, Hover Color, Hover Tooltip |
 | System Monitor (Sample) | CPU Color, RAM Color, Single/Double Click Action & Value, Hover Action, Hover Color, Hover Tooltip |
 | Media Player | Playing Color, Idle Color, Hover Color, Icon Size, Icon Spacing, Hide When Idle |
+| **Lyrics** | Font Size, Text Color, Synced Line Color, Offset (ms), Text Alignment |
 
 ---
 
@@ -304,6 +373,7 @@ Plugins may also expose their own settings through `IPluginWithSettings`.
 | 2 — Audio capture (FFT), media metadata, dominant color | ✅ |
 | 3 — Visualizer rendering (Bar/Line/Dot/Circle), tray icon | ✅ |
 | 4 — Settings dashboard, Acrylic/Mica/Game Mode removed, dark/light theme | ✅ |
+| 4.1 — Lyrics plugin (LRCLIB + Spicetify WebSocket) | ✅ |
 | 5 — Plugin marketplace, scripting support | 🔜 |
 
 ---

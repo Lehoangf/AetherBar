@@ -76,16 +76,17 @@ public partial class MainWindow : Window
 
         _hooker = new TaskbarHooker();
         _retryCount = 0;
+
+        _mediaManager = new MediaManager();
+        _mediaManager.MediaInfoChanged += OnMediaInfoChanged;
+        _mediaManager.StartMonitoring();
+
         TryEmbed();
 
         // attempt plugin initialization (TryEmbed will call InitializePluginsIfNeeded on success)
 
         _audioManager = new AudioManager();
         _audioManager.StartCapture();
-
-        _mediaManager = new MediaManager();
-        _mediaManager.MediaInfoChanged += OnMediaInfoChanged;
-        _mediaManager.StartMonitoring();
 
         _visualizer = new VisualizerController(_audioManager);
         VisualizerControl.SetController(_visualizer);
@@ -733,7 +734,9 @@ public partial class MainWindow : Window
                 catch { }
 
                 TextBlock topText = null!;
+                Border topTextBorder = null!;
                 TextBlock bottomText = null!;
+                Border bottomTextBorder = null!;
                 StackPanel stack = null!;
                 StackPanel iconsContainer = null!;
                 Border host = null!;
@@ -757,9 +760,12 @@ public partial class MainWindow : Window
                     bottomText.FontSize = Math.Max(6, currentFontSize - 2);
                     bottomText.LineHeight = Math.Ceiling(bottomText.FontSize * 1.35);
 
-                    var contentHeight = bottomText.Visibility == Visibility.Visible
-                        ? topText.LineHeight + bottomText.LineHeight
+                    var topHeight = topText.TextWrapping == TextWrapping.Wrap && topText.ActualWidth > 0
+                        ? topText.ActualHeight
                         : topText.LineHeight;
+                    var contentHeight = bottomText.Visibility == Visibility.Visible
+                        ? topHeight + bottomText.LineHeight
+                        : topHeight;
                     host.MinHeight = Math.Max(height, contentHeight + host.Padding.Top + host.Padding.Bottom);
                 }
 
@@ -769,7 +775,7 @@ public partial class MainWindow : Window
                     {
                         Text = name,
                         VerticalAlignment = VerticalAlignment.Center,
-                        HorizontalAlignment = HorizontalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
                         Margin = new Thickness(0, 0, 0, 0),
                         Foreground = (Brush)Application.Current.Resources["TextPrimary"],
                         FontSize = 11,
@@ -779,11 +785,17 @@ public partial class MainWindow : Window
                         TextAlignment = TextAlignment.Center
                     };
 
+                    topTextBorder = new Border
+                    {
+                        Child = topText,
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                    };
+
                     bottomText = new TextBlock
                     {
                         Text = string.Empty,
                         VerticalAlignment = VerticalAlignment.Center,
-                        HorizontalAlignment = HorizontalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
                         Margin = new Thickness(0, -2, 0, 0),
                         Foreground = (Brush)Application.Current.Resources["TextSecondary"],
                         FontSize = 9,
@@ -793,14 +805,20 @@ public partial class MainWindow : Window
                         Visibility = Visibility.Collapsed
                     };
 
+                    bottomTextBorder = new Border
+                    {
+                        Child = bottomText,
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                    };
+
                     stack = new StackPanel
                     {
                         Orientation = Orientation.Vertical,
                         VerticalAlignment = VerticalAlignment.Center,
                         HorizontalAlignment = HorizontalAlignment.Center,
                     };
-                    stack.Children.Add(topText);
-                    stack.Children.Add(bottomText);
+                    stack.Children.Add(topTextBorder);
+                    stack.Children.Add(bottomTextBorder);
 
                     iconsContainer = new StackPanel
                     {
@@ -926,6 +944,14 @@ public partial class MainWindow : Window
                         ? Visibility.Collapsed 
                         : Visibility.Visible;
                     UpdateTextLayoutMetrics();
+
+                    if (topText.TextWrapping == TextWrapping.Wrap)
+                    {
+                        Application.Current.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+                        {
+                            UpdateTextLayoutMetrics();
+                        }));
+                    }
                 });
                 try { Log($"Plugin widget update: {name} => {s}"); } catch { }
             }
@@ -1062,6 +1088,49 @@ public partial class MainWindow : Window
                     iconSpacing = iconSpacingCb;
                     RenderIcons();
                 });
+        }, wrap =>
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                topText.TextWrapping = wrap ? TextWrapping.Wrap : TextWrapping.NoWrap;
+                bottomText.TextWrapping = wrap ? TextWrapping.Wrap : TextWrapping.NoWrap;
+                UpdateTextLayoutMetrics();
+            });
+        }, maxWidth =>
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                var w = maxWidth ?? double.PositiveInfinity;
+                host.MaxWidth = w;
+                stack.MaxWidth = w;
+                var textW = w - host.Padding.Left - host.Padding.Right;
+                topTextBorder.Width = textW;
+                bottomTextBorder.Width = textW;
+                UpdateTextLayoutMetrics();
+            });
+        }, alignment =>
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                var textAlign = alignment?.ToLowerInvariant() switch
+                {
+                    "left" => TextAlignment.Left,
+                    "right" => TextAlignment.Right,
+                    _ => TextAlignment.Center
+                };
+                var hAlign = alignment?.ToLowerInvariant() switch
+                {
+                    "left" => HorizontalAlignment.Left,
+                    "right" => HorizontalAlignment.Right,
+                    _ => HorizontalAlignment.Center
+                };
+                topText.TextAlignment = textAlign;
+                bottomText.TextAlignment = textAlign;
+                topText.HorizontalAlignment = HorizontalAlignment.Stretch;
+                bottomText.HorizontalAlignment = HorizontalAlignment.Stretch;
+                stack.HorizontalAlignment = hAlign;
+                host.HorizontalAlignment = hAlign;
+            });
         });
 
                 // no native handle when hosted in WPF panel; set handle to 0

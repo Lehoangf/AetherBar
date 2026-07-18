@@ -36,6 +36,9 @@ public class PluginWidget : IDisposable
     private Action<string>? _updateIconColor;
     private Action<double>? _updateIconSize;
     private Action<double>? _updateIconSpacing;
+    private Action<bool>? _updateTextWrapping;
+    private Action<double?>? _updateMaxWidth;
+    private Action<string>? _updateTextAlignment;
 
     public Action<string, double, double>? OnMouseClick { get; set; }
     public Action<string, double, double>? OnMouseDoubleClick { get; set; }
@@ -55,7 +58,10 @@ public class PluginWidget : IDisposable
         Action<IList<string>>? updateIcons = null,
         Action<string>? updateIconColor = null,
         Action<double>? updateIconSize = null,
-        Action<double>? updateIconSpacing = null)
+        Action<double>? updateIconSpacing = null,
+        Action<bool>? updateTextWrapping = null,
+        Action<double?>? updateMaxWidth = null,
+        Action<string>? updateTextAlignment = null)
     {
         Name = name;
         Width = width;
@@ -71,6 +77,9 @@ public class PluginWidget : IDisposable
         _updateIconColor = updateIconColor;
         _updateIconSize = updateIconSize;
         _updateIconSpacing = updateIconSpacing;
+        _updateTextWrapping = updateTextWrapping;
+        _updateMaxWidth = updateMaxWidth;
+        _updateTextAlignment = updateTextAlignment;
     }
 
     public void SetHandle(nint handle) => Handle = handle;
@@ -219,6 +228,21 @@ public class PluginWidget : IDisposable
     public void SetOnHoverCallback(Action<bool>? onHover)
     {
         OnMouseHover = onHover;
+    }
+
+    public void SetTextWrapping(bool wrap)
+    {
+        try { _updateTextWrapping?.Invoke(wrap); } catch { }
+    }
+
+    public void SetMaxWidth(double? maxWidth)
+    {
+        try { _updateMaxWidth?.Invoke(maxWidth); } catch { }
+    }
+
+    public void SetTextAlignment(string alignment)
+    {
+        try { _updateTextAlignment?.Invoke(alignment); } catch { }
     }
 
     public void Dispose()
