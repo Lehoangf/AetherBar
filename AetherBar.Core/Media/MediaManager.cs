@@ -10,7 +10,12 @@ public class MediaManager : IDisposable, IMediaController
 {
     private bool _disposed;
     private Timer? _pollTimer;
+    private GlobalSystemMediaTransportControlsSessionManager? _smtcManager;
     private GlobalSystemMediaTransportControlsSession? _currentSession;
+
+    private TimeSpan _lastKnownPosition;
+    private DateTimeOffset _lastPositionTimestamp;
+    private bool _positionTracking;
 
     public event EventHandler<MediaInfo>? MediaInfoChanged;
 
@@ -22,6 +27,30 @@ public class MediaManager : IDisposable, IMediaController
     }
     private Action<MediaPlaybackStatus>? _statusChanged;
 
+    string IMediaController.Title => CurrentMedia.Title;
+    string IMediaController.Artist => CurrentMedia.Artist;
+    string IMediaController.Album => CurrentMedia.Album;
+    TimeSpan IMediaController.Duration => CurrentMedia.Duration;
+    TimeSpan IMediaController.Position
+    {
+        get
+        {
+            if (_positionTracking && CurrentMedia.PlaybackStatus == MediaPlaybackStatus.Playing)
+            {
+                var elapsed = DateTimeOffset.UtcNow - _lastPositionTimestamp;
+                return _lastKnownPosition + elapsed;
+            }
+            return CurrentMedia.Position;
+        }
+    }
+
+    event EventHandler? IMediaController.MediaInfoChanged
+    {
+        add => _mediaInfoChangedForPlugins += value;
+        remove => _mediaInfoChangedForPlugins -= value;
+    }
+    private EventHandler? _mediaInfoChangedForPlugins;
+
     public MediaInfo CurrentMedia { get; private set; } = new()
     {
         Title = "No media playing",
@@ -32,13 +61,21 @@ public class MediaManager : IDisposable, IMediaController
     {
         try
         {
-            _pollTimer = new Timer(PollMediaInfo, null, 0, 1000);
+            _smtcManager = GlobalSystemMediaTransportControlsSessionManager.RequestAsync().GetAwaiter().GetResult();
+            _smtcManager.CurrentSessionChanged += OnCurrentSessionChanged;
+            _currentSession = _smtcManager.GetCurrentSession();
+            _pollTimer = new Timer(PollMediaInfo, null, 0, 500);
             return true;
         }
         catch
         {
             return false;
         }
+    }
+
+    private void OnCurrentSessionChanged(GlobalSystemMediaTransportControlsSessionManager sender, CurrentSessionChangedEventArgs args)
+    {
+        _currentSession = sender.GetCurrentSession();
     }
 
     private void PollMediaInfo(object? state)
@@ -52,19 +89,32 @@ public class MediaManager : IDisposable, IMediaController
                 {
                     var oldStatus = CurrentMedia.PlaybackStatus;
                     CurrentMedia = mediaInfo;
+                    _lastKnownPosition = mediaInfo.Position;
+                    _lastPositionTimestamp = DateTimeOffset.UtcNow;
+                    _positionTracking = true;
                     if (oldStatus != mediaInfo.PlaybackStatus)
                         _statusChanged?.Invoke(mediaInfo.PlaybackStatus);
                     MediaInfoChanged?.Invoke(this, mediaInfo);
+                    _mediaInfoChangedForPlugins?.Invoke(this, EventArgs.Empty);
+                }
+                else
+                {
+                    CurrentMedia = mediaInfo;
+                    _lastKnownPosition = mediaInfo.Position;
+                    _lastPositionTimestamp = DateTimeOffset.UtcNow;
+                    _positionTracking = true;
                 }
             }
             else if (CurrentMedia.PlaybackStatus != MediaPlaybackStatus.Closed)
             {
                 var oldStatus = CurrentMedia.PlaybackStatus;
                 CurrentMedia = CreateClosedMediaInfo();
+                _positionTracking = false;
                 _currentSession = null;
                 if (oldStatus != MediaPlaybackStatus.Closed)
                     _statusChanged?.Invoke(MediaPlaybackStatus.Closed);
                 MediaInfoChanged?.Invoke(this, CurrentMedia);
+                _mediaInfoChangedForPlugins?.Invoke(this, EventArgs.Empty);
             }
         }
         catch
@@ -93,12 +143,9 @@ public class MediaManager : IDisposable, IMediaController
     {
         try
         {
-            var smtcManager = GlobalSystemMediaTransportControlsSessionManager.RequestAsync().GetAwaiter().GetResult();
-            var session = smtcManager.GetCurrentSession();
+            var session = _currentSession;
             if (session == null)
                 return null;
-
-            _currentSession = session;
 
             var mediaProps = session.TryGetMediaPropertiesAsync().GetAwaiter().GetResult();
             if (mediaProps == null)
@@ -187,6 +234,11 @@ public class MediaManager : IDisposable, IMediaController
     {
         if (_disposed) return;
         StopMonitoring();
+        if (_smtcManager != null)
+        {
+            _smtcManager.CurrentSessionChanged -= OnCurrentSessionChanged;
+            _smtcManager = null;
+        }
         _currentSession = null;
         _disposed = true;
         GC.SuppressFinalize(this);
