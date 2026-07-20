@@ -111,11 +111,16 @@ Displays synced lyrics for the currently playing song, line by line, with real-t
 **Settings:**
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Font Size | 10 | Text size (8–20) |
+| Auto Size | off | Auto-adjust font size to fit available height; Font Size is locked when enabled |
+| Font Size | 10 | Text size (8–20); disabled when Auto Size is on |
+| Line Height | 1.35 | Line height multiplier (0.8–2.5, default 1.35) |
+| Text Alignment | center | left / center / right when text wraps |
 | Text Color | #FFFFFF | Default text color |
 | Synced Line Color | #FFD700 | Color for current playing line |
 | Offset (ms) | 0 | Timing offset (+ earlier, − later) |
-| Text Alignment | center | left / center / right when text wraps |
+
+**Auto-size behavior:**
+Text wraps automatically at the widget boundary. When Auto Size is enabled, the plugin continuously adjusts font size to fill the available row height — larger for short single-line lyrics, smaller when wrapping to 2–3 lines. The font is binary-searched between 6px and 15px for the optimal fit.
 
 **Position source:**
 By default, position is read from Windows SMTC (System Media Transport Controls) which works with any audio source (Spotify, YouTube, Chrome, etc.) but has ~200–500ms latency. For sub-second accuracy with Spotify, install the Spicetify WebSocket extension (see below).
@@ -361,7 +366,7 @@ Plugins may also expose their own settings through `IPluginWithSettings`.
 | Custom Text | Text Content, Font Size, Vertical Offset, Text Color, Single/Double Click Action & Value, Hover Action, Hover Color, Hover Tooltip |
 | System Monitor (Sample) | CPU Color, RAM Color, Single/Double Click Action & Value, Hover Action, Hover Color, Hover Tooltip |
 | Media Player | Playing Color, Idle Color, Hover Color, Icon Size, Icon Spacing, Hide When Idle |
-| **Lyrics** | Font Size, Text Color, Synced Line Color, Offset (ms), Text Alignment |
+| **Lyrics** | Auto Size, Font Size, Line Height, Text Color, Synced Line Color, Offset (ms), Text Alignment |
 
 ---
 
