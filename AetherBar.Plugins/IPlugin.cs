@@ -39,6 +39,8 @@ public class PluginWidget : IDisposable
     private Action<bool>? _updateTextWrapping;
     private Action<double?>? _updateMaxWidth;
     private Action<string>? _updateTextAlignment;
+    private Action<double>? _updateLineHeight;
+    private Action<bool>? _updateAutoSize;
 
     public Action<string, double, double>? OnMouseClick { get; set; }
     public Action<string, double, double>? OnMouseDoubleClick { get; set; }
@@ -61,7 +63,9 @@ public class PluginWidget : IDisposable
         Action<double>? updateIconSpacing = null,
         Action<bool>? updateTextWrapping = null,
         Action<double?>? updateMaxWidth = null,
-        Action<string>? updateTextAlignment = null)
+        Action<string>? updateTextAlignment = null,
+        Action<double>? updateLineHeight = null,
+        Action<bool>? updateAutoSize = null)
     {
         Name = name;
         Width = width;
@@ -80,6 +84,8 @@ public class PluginWidget : IDisposable
         _updateTextWrapping = updateTextWrapping;
         _updateMaxWidth = updateMaxWidth;
         _updateTextAlignment = updateTextAlignment;
+        _updateLineHeight = updateLineHeight;
+        _updateAutoSize = updateAutoSize;
     }
 
     public void SetHandle(nint handle) => Handle = handle;
@@ -243,6 +249,16 @@ public class PluginWidget : IDisposable
     public void SetTextAlignment(string alignment)
     {
         try { _updateTextAlignment?.Invoke(alignment); } catch { }
+    }
+
+    public void SetLineHeight(double lineHeight)
+    {
+        try { _updateLineHeight?.Invoke(lineHeight); } catch { }
+    }
+
+    public void SetAutoSize(bool autoSize)
+    {
+        try { _updateAutoSize?.Invoke(autoSize); } catch { }
     }
 
     public void Dispose()

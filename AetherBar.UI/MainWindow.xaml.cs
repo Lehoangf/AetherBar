@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -52,6 +53,7 @@ public partial class MainWindow : Window
         public string WidgetName { get; set; } = string.Empty;
         public Border Host { get; set; } = null!;
         public int DefaultWidth { get; set; }
+        public Action? UpdateLayout { get; set; }
     }
 
     private readonly List<ActivePluginWidgetInfo> _activePluginWidgets = new();
@@ -121,6 +123,7 @@ public partial class MainWindow : Window
         _positionTimer.Start();
 
         RefreshSettings();
+        VisualizerRow.SizeChanged += (_, _) => RefreshSettings();
         SetupTrayIcon();
 
         if (!_settingsManager.Current.General.StartMinimized)
@@ -427,7 +430,7 @@ public partial class MainWindow : Window
                     translate = new TranslateTransform();
                     info.Host.RenderTransform = translate;
                 }
-                translate.X = padding; // Use padding setting as translation X offset
+                translate.X = alignment == "Right" ? 0 : alignment == "Center" ? padding - 2 : padding;
                 translate.Y = verticalOffset;
 
                 // Apply width and min-width
@@ -440,6 +443,30 @@ public partial class MainWindow : Window
                 {
                     info.Host.Width = double.NaN; // Auto / Default
                     info.Host.MinWidth = Math.Min(info.DefaultWidth, 80);
+                }
+
+                // Constrain text wrapping to available panel width
+                var wrapWidth = width > 0 ? width : VisualizerRow.ActualWidth;
+                if (wrapWidth > 0 && info.Host.Child is StackPanel innerStack)
+                {
+                    var textMaxW = wrapWidth - info.Host.Padding.Left - info.Host.Padding.Right;
+                    var needsLayout = false;
+                    foreach (var child in innerStack.Children)
+                    {
+                        if (child is Border textBorder && textBorder.Child is TextBlock tb)
+                        {
+                            if (Math.Abs(tb.MaxWidth - textMaxW) > 0.5)
+                            {
+                                tb.MaxWidth = textMaxW;
+                                needsLayout = true;
+                            }
+                        }
+                    }
+                    if (needsLayout)
+                    {
+                        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,
+                            new Action(() => info.UpdateLayout?.Invoke()));
+                    }
                 }
             }
 
@@ -741,6 +768,8 @@ public partial class MainWindow : Window
                 StackPanel iconsContainer = null!;
                 Border host = null!;
                 double currentFontSize = 11;
+                double lineHeightMultiplier = 1.35;
+                bool autoSizeEnabled = false;
 
                 Brush? CreateColorBrush(string color)
                 {
@@ -756,17 +785,97 @@ public partial class MainWindow : Window
 
                 void UpdateTextLayoutMetrics()
                 {
-                    topText.LineHeight = Math.Ceiling(currentFontSize * 1.35);
+                    topText.LineHeight = Math.Ceiling(currentFontSize * lineHeightMultiplier);
                     bottomText.FontSize = Math.Max(6, currentFontSize - 2);
-                    bottomText.LineHeight = Math.Ceiling(bottomText.FontSize * 1.35);
+                    bottomText.LineHeight = Math.Ceiling(bottomText.FontSize * lineHeightMultiplier);
 
-                    var topHeight = topText.TextWrapping == TextWrapping.Wrap && topText.ActualWidth > 0
-                        ? topText.ActualHeight
-                        : topText.LineHeight;
-                    var contentHeight = bottomText.Visibility == Visibility.Visible
-                        ? topHeight + bottomText.LineHeight
-                        : topHeight;
-                    host.MinHeight = Math.Max(height, contentHeight + host.Padding.Top + host.Padding.Bottom);
+                    if (topText.TextWrapping != TextWrapping.Wrap || topText.ActualWidth <= 0)
+                    {
+                        host.MinHeight = Math.Max(height, topText.LineHeight + host.Padding.Top + host.Padding.Bottom);
+                        return;
+                    }
+
+                    var rowHeight = _mainWindow.VisualizerRow.ActualHeight > 0
+                        ? _mainWindow.VisualizerRow.ActualHeight
+                        : _mainWindow.VisualizerRow.Height;
+                    var maxContentHeight = rowHeight - host.Padding.Top - host.Padding.Bottom;
+
+                    if (autoSizeEnabled)
+                    {
+                        var bestSize = FindOptimalFontSize(topText.Text, maxContentHeight, topText.MaxWidth,
+                            lineHeightMultiplier,
+                            bottomText.Visibility == Visibility.Visible,
+                            Math.Ceiling(bottomText.Visibility == Visibility.Visible ? bottomText.FontSize * lineHeightMultiplier : 0));
+                        bestSize = Math.Max(6, Math.Min(15, Math.Floor(bestSize)));
+                        if (Math.Abs(bestSize - currentFontSize) > 0.5)
+                        {
+                            currentFontSize = bestSize;
+                            topText.FontSize = bestSize;
+                            topText.LineHeight = Math.Ceiling(bestSize * lineHeightMultiplier);
+                            Application.Current.Dispatcher.BeginInvoke(
+                                System.Windows.Threading.DispatcherPriority.Loaded,
+                                new Action(() => UpdateTextLayoutMetrics()));
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        var topHeight = topText.ActualWidth > 0 ? topText.ActualHeight : topText.LineHeight;
+                        var contentHeight = bottomText.Visibility == Visibility.Visible
+                            ? topHeight + bottomText.LineHeight
+                            : topHeight;
+
+                        if (contentHeight > maxContentHeight && currentFontSize > 8)
+                        {
+                            var scale = maxContentHeight / contentHeight;
+                            var newSize = Math.Max(8, Math.Floor(currentFontSize * scale));
+                            if (newSize < currentFontSize)
+                            {
+                                topText.FontSize = newSize;
+                                currentFontSize = newSize;
+                                topText.LineHeight = Math.Ceiling(newSize * lineHeightMultiplier);
+                                Application.Current.Dispatcher.BeginInvoke(
+                                    System.Windows.Threading.DispatcherPriority.Loaded,
+                                    new Action(() => UpdateTextLayoutMetrics()));
+                                return;
+                            }
+                        }
+                    }
+
+                    var finalTopHeight = topText.ActualWidth > 0 ? topText.ActualHeight : topText.LineHeight;
+                    var finalContentHeight = bottomText.Visibility == Visibility.Visible
+                        ? finalTopHeight + bottomText.LineHeight
+                        : finalTopHeight;
+                    host.MinHeight = Math.Max(height, finalContentHeight + host.Padding.Top + host.Padding.Bottom);
+                }
+
+                double FindOptimalFontSize(string text, double availableHeight, double maxTextWidth,
+                    double lineHeightRatio, bool hasBottomLine, double bottomLineHeight)
+                {
+                    double lo = 6, hi = 24;
+                    double best = 6;
+                    var typeface = new Typeface(topText.FontFamily, topText.FontStyle, topText.FontWeight, topText.FontStretch);
+                    for (int i = 0; i < 10; i++)
+                    {
+                        double mid = (lo + hi) / 2;
+                        var lh = Math.Ceiling(mid * lineHeightRatio);
+                        var ft = new FormattedText(text, CultureInfo.CurrentCulture,
+                            FlowDirection.LeftToRight, typeface, mid, topText.Foreground,
+                            VisualTreeHelper.GetDpi(topText).PixelsPerDip);
+                        ft.MaxTextWidth = maxTextWidth;
+                        ft.LineHeight = lh;
+                        var totalHeight = ft.Height + (hasBottomLine ? bottomLineHeight : 0);
+                        if (totalHeight <= availableHeight)
+                        {
+                            best = mid;
+                            lo = mid + 0.5;
+                        }
+                        else
+                        {
+                            hi = mid - 0.5;
+                        }
+                    }
+                    return best;
                 }
 
                 Application.Current.Dispatcher.Invoke(() =>
@@ -815,7 +924,7 @@ public partial class MainWindow : Window
                     {
                         Orientation = Orientation.Vertical,
                         VerticalAlignment = VerticalAlignment.Center,
-                        HorizontalAlignment = HorizontalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
                     };
                     stack.Children.Add(topTextBorder);
                     stack.Children.Add(bottomTextBorder);
@@ -848,13 +957,14 @@ public partial class MainWindow : Window
                     _container.Children.Add(host);
                     try
                     {
-                        var info = new ActivePluginWidgetInfo
-                        {
-                            Plugin = CurrentPlugin,
-                            WidgetName = name,
-                            Host = host,
-                            DefaultWidth = width
-                        };
+                    var info = new ActivePluginWidgetInfo
+                    {
+                        Plugin = CurrentPlugin,
+                        WidgetName = name,
+                        Host = host,
+                        DefaultWidth = width,
+                        UpdateLayout = UpdateTextLayoutMetrics
+                    };
                         _mainWindow._activePluginWidgets.Add(info);
                     }
                     catch (Exception ex)
@@ -1101,11 +1211,15 @@ public partial class MainWindow : Window
             Application.Current.Dispatcher.Invoke(() =>
             {
                 var w = maxWidth ?? double.PositiveInfinity;
-                host.MaxWidth = w;
-                stack.MaxWidth = w;
-                var textW = w - host.Padding.Left - host.Padding.Right;
-                topTextBorder.Width = textW;
-                bottomTextBorder.Width = textW;
+                host.MaxWidth = double.IsInfinity(w) ? double.PositiveInfinity : w;
+                stack.MaxWidth = double.IsInfinity(w) ? double.PositiveInfinity : w;
+                // Constrain text wrapping via MaxWidth on the TextBlock itself
+                if (!double.IsInfinity(w))
+                {
+                    var textMaxW = w - host.Padding.Left - host.Padding.Right;
+                    topText.MaxWidth = textMaxW;
+                    bottomText.MaxWidth = textMaxW;
+                }
                 UpdateTextLayoutMetrics();
             });
         }, alignment =>
@@ -1128,8 +1242,26 @@ public partial class MainWindow : Window
                 bottomText.TextAlignment = textAlign;
                 topText.HorizontalAlignment = HorizontalAlignment.Stretch;
                 bottomText.HorizontalAlignment = HorizontalAlignment.Stretch;
-                stack.HorizontalAlignment = hAlign;
                 host.HorizontalAlignment = hAlign;
+            });
+        }, lineHeight =>
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (lineHeight > 0)
+                {
+                    lineHeightMultiplier = lineHeight;
+                    topText.LineHeight = Math.Ceiling(currentFontSize * lineHeightMultiplier);
+                    bottomText.LineHeight = Math.Ceiling(bottomText.FontSize * lineHeightMultiplier);
+                    UpdateTextLayoutMetrics();
+                }
+            });
+        }, autoSize =>
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                autoSizeEnabled = autoSize;
+                UpdateTextLayoutMetrics();
             });
         });
 

@@ -1042,6 +1042,9 @@ public partial class SettingsWindow : Window
                 return;
             }
 
+            CheckBox? autoSizeCb = null;
+            StackPanel? fontSizePanel = null;
+
             foreach (var def in defs)
             {
                 string? currentValue = null;
@@ -1063,6 +1066,8 @@ public partial class SettingsWindow : Window
                         FontSize = 13,
                         FontWeight = FontWeights.Medium
                     };
+                    if (def.Key == "AutoSize")
+                        autoSizeCb = cb;
                     cb.Checked += (s, e) => SaveCustomSetting(pluginName, def.Key, "true");
                     cb.Unchecked += (s, e) => SaveCustomSetting(pluginName, def.Key, "false");
                     panel.Children.Add(cb);
@@ -1094,6 +1099,8 @@ public partial class SettingsWindow : Window
                             ItemsSource = def.Options,
                             SelectedItem = currentValue
                         };
+                        if (def.Key == "FontSize")
+                            fontSizePanel = panel;
                         combo.SelectionChanged += (s, e) =>
                         {
                             if (combo.SelectedItem is string val)
@@ -1116,6 +1123,8 @@ public partial class SettingsWindow : Window
                             BorderThickness = new Thickness(1),
                         };
 
+                        if (def.Key == "FontSize")
+                            fontSizePanel = panel;
                         tb.TextChanged += (s, e) => SaveCustomSetting(pluginName, def.Key, tb.Text);
                         panel.Children.Add(tb);
                     }
@@ -1135,6 +1144,15 @@ public partial class SettingsWindow : Window
                 }
 
                 CustomSettingsContainer.Children.Add(panel);
+            }
+
+            // Wire AutoSize toggle to enable/disable FontSize control
+            if (autoSizeCb != null && fontSizePanel != null)
+            {
+                void ToggleFontSize() => fontSizePanel.IsEnabled = autoSizeCb.IsChecked != true;
+                autoSizeCb.Checked += (_, _) => ToggleFontSize();
+                autoSizeCb.Unchecked += (_, _) => ToggleFontSize();
+                ToggleFontSize();
             }
         }
         else

@@ -35,6 +35,8 @@ public class LyricsPlugin : IPluginWithSettings
     private string _noLyricsColor = "#888888";
     private int _offsetMs;
     private string _alignment = "center";
+    private double _lineHeight = 1.35;
+    private bool _autoSize;
     private string _lastWidgetContent = string.Empty;
 
     private Timer? _syncTimer;
@@ -51,6 +53,8 @@ public class LyricsPlugin : IPluginWithSettings
         _widget.SetTextWrapping(true);
         _widget.SetMaxWidth(300);
         _widget.SetTextAlignment(_alignment);
+        _widget.SetLineHeight(_lineHeight);
+        _widget.SetAutoSize(_autoSize);
         _widget.SetContent("♪ Lyrics");
 
         StartSpicetify();
@@ -342,11 +346,13 @@ public class LyricsPlugin : IPluginWithSettings
     {
         return
         [
+            new PluginSettingDefinition("AutoSize", "Auto Size", "bool", "false", "Auto-adjust font size to fit available height"),
             new PluginSettingDefinition("FontSize", "Font Size", "int", "10", "Lyrics text size (8-20)"),
+            new PluginSettingDefinition("LineHeight", "Line Height", "double", "1.35", "Line height multiplier (0.8-2.5, default 1.35)"),
+            new PluginSettingDefinition("Alignment", "Text Alignment", "string", "center", "Text alignment when wrapping", new List<string> { "left", "center", "right" }),
             new PluginSettingDefinition("TextColor", "Text Color", "string", "#FFFFFF", "Default text color"),
             new PluginSettingDefinition("SyncColor", "Synced Line Color", "string", "#FFD700", "Color for current playing line"),
             new PluginSettingDefinition("OffsetMs", "Offset (ms)", "int", "0", "Lyrics offset in milliseconds (positive = lyrics earlier, negative = lyrics later)"),
-            new PluginSettingDefinition("Alignment", "Text Alignment", "string", "center", "Text alignment when wrapping", new List<string> { "left", "center", "right" }),
         ];
     }
 
@@ -371,6 +377,14 @@ public class LyricsPlugin : IPluginWithSettings
             case "Alignment":
                 _alignment = value;
                 _widget?.SetTextAlignment(_alignment);
+                break;
+            case "LineHeight" when double.TryParse(value, out var lh):
+                _lineHeight = lh;
+                _widget?.SetLineHeight(_lineHeight);
+                break;
+            case "AutoSize" when bool.TryParse(value, out var auto):
+                _autoSize = auto;
+                _widget?.SetAutoSize(_autoSize);
                 break;
         }
     }
